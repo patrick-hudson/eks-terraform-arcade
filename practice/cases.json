@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "drills": [
+    {
+      "id": "service-request-a",
+      "kind": "investigation",
+      "title": "A Service request fails — A",
+      "summary": "Trace a failed Service request from client to backend.",
+      "brief": "A request from the diagnostic Pod to http://app.arcade-shop.svc.cluster.local:8080/ fails after a release. The application Pods exist. You have made no changes yet. Choose observations that distinguish a Service configuration problem from an unhealthy backend, then choose the best supported repair.",
+      "minutes": 10,
+      "skills": [
+        "service-routing",
+        "evidence-selection",
+        "terraform-repair"
+      ],
+      "relatedLabs": [
+        "08-kubernetes-release",
+        "11-incident-gauntlet/scenario-04",
+        "13-public-access"
+      ],
+      "observations": [
+        {
+          "id": "request",
+          "label": "Client request and DNS lookup",
+          "command": "kubectl --context arcade-lab -n arcade-shop exec arcade-diagnostics -- sh -c 'nslookup app.arcade-shop.svc.cluster.local; curl --connect-timeout 3 http://app.arcade-shop.svc.cluster.local:8080/'",
+          "output": "DNS answer: app.arcade-shop.svc.cluster.local -> 172.20.18.40\nHTTP request to 172.20.18.40:8080: connection failed; no application response.\nThese are two separate observations: name resolution succeeded; the Service request did not."
+        },
+        {
+          "id": "service",
+          "label": "Service selector and ports",
+          "command": "kubectl --context arcade-lab -n arcade-shop get service app -o yaml",
+          "output": "Service app (abridged):\n  type: ClusterIP\n  clusterIP: 172.20.18.40\n  selector: {app: checkout-v1}\n  ports: [{port: 8080, targetPort: 8080, protocol: TCP}]\n  publishNotReadyAddresses: false"
+        },
+        {
+          "id": "pods",
+          "label": "Pod labels, readiness and events",
+          "command": "kubectl --context arcade-lab -n arcade-shop get pods --show-labels; kubectl --context arcade-lab -n arcade-shop describe pod checkout-7d6d-abc",
+          "output": "NAME               READY  STATUS   LABELS\ncheckout-7d6d-abc  1/1    Running  app=checkout,release=v2\nPod IP: 10.0.2.31\nReadiness probe: HTTP GET :8080/readyz\nReady condition: True\nRecent events: container started; no probe failures.\nSelector app=checkout-v1 matches zero Pods in this namespace."
+        },
+        {
+          "id": "endpoints",
+          "label": "Service backend membership",
+          "command": "kubectl --context arcade-lab -n arcade-shop get endpointslices -l kubernetes.io/service-name=app -o yaml",
+          "output": "EndpointSlice for Service app (abridged):\n  addressType: IPv4\n  endpoints: []\nNo backend address is selected. This does not by itself identify which labels are wrong; compare the Service and Pod evidence."
+        },
+        {
+          "id": "application",
+          "label": "Application responses at the Pod address",
+          "command": "kubectl --context arcade-lab -n arcade-shop exec arcade-diagnostics -- sh -c 'curl -i http://10.0.2.31:8080/; curl -i http://10.0.2.31:8080/readyz; curl -i http://10.0.2.31:8080/ready'",
+          "output": "Direct Pod address 10.0.2.31:8080:\nGET / -> HTTP 200, body: checkout-v2\nGET /readyz -> HTTP 200, body: ready\nGET /ready -> HTTP 404, body: not found\nThe release's documented readiness contract is GET /readyz on port 8080. These responses are from the intended application."
+        }
+      ],
+      "question": {
+        "prompt": "Which diagnosis and Terraform repair are best supported?",
+        "options": [
+          {
+            "id": "selector",
+            "text": "The Service selects the wrong Pod labels; align its selector with the intended workload in Terraform source."
+          },
+          {
+            "id": "readiness",
+            "text": "The readiness check rejects the intended backend; repair the probe contract in Terraform source."
+          },
+          {
+            "id": "target-port",
+            "text": "The Service sends traffic to the wrong port; change its targetPort in Terraform source."
+          },
+          {
+            "id": "dns",
+            "text": "Cluster DNS is failing; change the DNS configuration in its owning Terraform root."
+          }
+        ]
+      },
+      "answer": {
+        "optionId": "selector",
+        "explanation": "The Service selects app=checkout-v1, while the intended Pod has app=checkout. No Pod matches, so there is no backend. The Pod is ready and answers on 8080, which weakens the readiness and port explanations. DNS already returned the Service address. Changing DNS or disabling readiness would not fix this selection mismatch.",
+        "decisiveEvidence": [
+          "service",
+          "pods",
+          "endpoints",
+          "application"
+        ],
+        "repair": "In the workload's Terraform source (candidate.yaml where the mission uses the exercise module), change the Service selector to the stable app=checkout label. Preserve the intended Deployment selector and Pod labels; avoid selecting a release-specific label that breaks the next rollout. Review a saved Terraform plan scoped to the owned workload before applying it. Do not patch the live Service or widen account/network access to mask the error.",
+        "verification": "Simulated feedback proves only that this choice fits the authored observations. For live recovery, compare Service selection with Pod labels, wait for the rollout and a ready EndpointSlice, then request the Service DNS name from the Terraform-managed diagnostic client and check HTTP 200 plus checkout-v2. A direct Pod response alone bypasses the Service. A successful Terraform apply or an empty plan proves neither reachability nor readiness. These checks establish in-cluster traffic; public internet access requires Game 13's separate HTTP request from your workstation to the actual public URL.",
+        "cleanup": "This simulation creates nothing to clean up. In a live mission, review and apply the owning workload root's saved Terraform destroy plan, check its state and dedicated namespace, and keep the foundation only while continuing practice. A closed browser or empty workload state does not prove all AWS resources are gone. Check dependent workloads before Game 07 teardown; preserve unrelated shared-account resources and the $20 total allowance.",
+        "followUp": "The next release will run v2 and v3 Pods together for ten minutes. Which labels should stay stable, and what evidence would show that this Service sends traffic only to the intended application?"
+      },
+      "provenance": "Authored simulation with invented, abridged observations. No commands are executed and no live AWS or Kubernetes system was observed."
+    },
+    {
+      "id": "service-request-b",
+      "kind": "investigation",
+      "title": "A Service request fails — B",
+      "summary": "Trace a failed Service request from client to backend.",
+      "brief": "A request from the diagnostic Pod to http://app.arcade-shop.svc.cluster.local:8080/ fails after a release. The application Pods exist. You have made no changes yet. Choose observations that distinguish a Service configuration problem from an unhealthy backend, then choose the best supported repair.",
+      "minutes": 10,
+      "skills": [
+        "service-routing",
+        "evidence-selection",
+        "terraform-repair"
+      ],
+      "relatedLabs": [
+        "08-kubernetes-release",
+        "11-incident-gauntlet/scenario-04",
+        "13-public-access"
+      ],
+      "observations": [
+        {
+          "id": "request",
+          "label": "Client request and DNS lookup",
+          "command": "kubectl --context arcade-lab -n arcade-shop exec arcade-diagnostics -- sh -c 'nslookup app.arcade-shop.svc.cluster.local; curl --connect-timeout 3 http://app.arcade-shop.svc.cluster.local:8080/'",
+          "output": "DNS answer: app.arcade-shop.svc.cluster.local -> 172.20.18.40\nHTTP request to 172.20.18.40:8080: connection failed; no application response.\nThese are two separate observations: name resolution succeeded; the Service request did not."
+        },
+        {
+          "id": "service",
+          "label": "Service selector and ports",
+          "command": "kubectl --context arcade-lab -n arcade-shop get service app -o yaml",
+          "output": "Service app (abridged):\n  type: ClusterIP\n  clusterIP: 172.20.18.40\n  selector: {app: checkout}\n  ports: [{port: 8080, targetPort: 8080, protocol: TCP}]\n  publishNotReadyAddresses: false"
+        },
+        {
+          "id": "pods",
+          "label": "Pod labels, readiness and events",
+          "command": "kubectl --context arcade-lab -n arcade-shop get pods --show-labels; kubectl --context arcade-lab -n arcade-shop describe pod checkout-7d6d-abc",
+          "output": "NAME               READY  STATUS   LABELS\ncheckout-7d6d-abc  0/1    Running  app=checkout,release=v2\nPod IP: 10.0.2.31\nReadiness probe: HTTP GET :8080/ready\nReady condition: False\nRecent event: Warning Unhealthy — Readiness probe failed: HTTP probe failed with statuscode: 404\nSelector app=checkout matches this Pod. No container restarts are recorded."
+        },
+        {
+          "id": "endpoints",
+          "label": "Service backend membership",
+          "command": "kubectl --context arcade-lab -n arcade-shop get endpointslices -l kubernetes.io/service-name=app -o yaml",
+          "output": "EndpointSlice for Service app (abridged):\n  addressType: IPv4\n  endpoints:\n    - addresses: [10.0.2.31]\n      conditions: {ready: false}\n  ports: [{port: 8080, protocol: TCP}]\nThe intended Pod is selected, but it is not a ready backend."
+        },
+        {
+          "id": "application",
+          "label": "Application responses at the Pod address",
+          "command": "kubectl --context arcade-lab -n arcade-shop exec arcade-diagnostics -- sh -c 'curl -i http://10.0.2.31:8080/; curl -i http://10.0.2.31:8080/readyz; curl -i http://10.0.2.31:8080/ready'",
+          "output": "Direct Pod address 10.0.2.31:8080:\nGET / -> HTTP 200, body: checkout-v2\nGET /readyz -> HTTP 200, body: ready\nGET /ready -> HTTP 404, body: not found\nThe release's documented readiness contract is GET /readyz on port 8080. These responses are from the intended application."
+        }
+      ],
+      "question": {
+        "prompt": "Which diagnosis and Terraform repair are best supported?",
+        "options": [
+          {
+            "id": "selector",
+            "text": "The Service selects the wrong Pod labels; align its selector with the intended workload in Terraform source."
+          },
+          {
+            "id": "readiness",
+            "text": "The readiness check rejects the intended backend; repair the probe contract in Terraform source."
+          },
+          {
+            "id": "target-port",
+            "text": "The Service sends traffic to the wrong port; change its targetPort in Terraform source."
+          },
+          {
+            "id": "dns",
+            "text": "Cluster DNS is failing; change the DNS configuration in its owning Terraform root."
+          }
+        ]
+      },
+      "answer": {
+        "optionId": "readiness",
+        "explanation": "The Service selector matches the intended Pod and its port matches the responding application. The EndpointSlice includes that Pod with ready=false. Probe events show 404 on /ready, while the documented /readyz endpoint returns 200. This is a probe-path contract mismatch, not a missing selector, broken DNS or incorrect target port. Running means a container started; it does not mean it is ready to receive Service traffic.",
+        "decisiveEvidence": [
+          "service",
+          "pods",
+          "endpoints",
+          "application"
+        ],
+        "repair": "Change the readiness probe path to the documented /readyz endpoint in the Terraform-owned workload input, then review and apply a saved Terraform plan for that workload. Keep a meaningful readiness check. Removing the probe or setting publishNotReadyAddresses=true would allow traffic without proving the application can serve it. If /readyz itself fails in a real incident, investigate its dependency checks before changing the probe.",
+        "verification": "Simulated feedback proves only that this choice fits the authored observations. For live recovery, compare Service selection with Pod labels, wait for the rollout and a ready EndpointSlice, then request the Service DNS name from the Terraform-managed diagnostic client and check HTTP 200 plus checkout-v2. A direct Pod response alone bypasses the Service. A successful Terraform apply or an empty plan proves neither reachability nor readiness. These checks establish in-cluster traffic; public internet access requires Game 13's separate HTTP request from your workstation to the actual public URL.",
+        "cleanup": "This simulation creates nothing to clean up. In a live mission, review and apply the owning workload root's saved Terraform destroy plan, check its state and dedicated namespace, and keep the foundation only while continuing practice. A closed browser or empty workload state does not prove all AWS resources are gone. Check dependent workloads before Game 07 teardown; preserve unrelated shared-account resources and the $20 total allowance.",
+        "followUp": "The corrected readiness endpoint now returns 503 only when the database is slow. What evidence would justify changing its timeout, and what would make that change hide a dependency failure?"
+      },
+      "provenance": "Authored simulation with invented, abridged observations. No commands are executed and no live AWS or Kubernetes system was observed."
+    },
+    {
+      "id": "pending-pod-a",
+      "kind": "investigation",
+      "title": "A Pod stays Pending — A",
+      "summary": "Separate scheduling constraints from storage and startup failures.",
+      "brief": "The release Pod stays Pending and has not been assigned to a node. The rollout has not completed. You have made no changes yet. Decide what prevents scheduling now, and which source change the available evidence supports.",
+      "minutes": 10,
+      "skills": [
+        "pod-scheduling",
+        "evidence-selection",
+        "terraform-repair"
+      ],
+      "relatedLabs": [
+        "11-incident-gauntlet/scenario-05",
+        "10-ebs-storage",
+        "07-eks-foundation"
+      ],
+      "observations": [
+        {
+          "id": "pod",
+          "label": "Pod scheduling condition and events",
+          "command": "kubectl --context arcade-lab -n arcade-batch describe pod worker-6b7d-abc",
+          "output": "Pod worker-6b7d-abc:\n  Phase: Pending\n  Node: <none>\n  PodScheduled: False\n  Container requests: cpu=8000m, memory=128Mi\n  Volumes: projected service-account volume only; no PersistentVolumeClaim\n  Event: FailedScheduling — 0/1 nodes are available: 1 Insufficient cpu.\n  Preemption would not help scheduling. No image pull has been attempted on a node."
+        },
+        {
+          "id": "nodes",
+          "label": "Node capacity, reservations and taints",
+          "command": "kubectl --context arcade-lab describe node worker-1",
+          "output": "Node worker-1:\n  Ready: True\n  Taints: <none>\n  Allocatable: cpu=1930m, memory=3500Mi\n  Allocated requests from already scheduled Pods: cpu=450m, memory=600Mi\n  Allocated limits are a separate accounting measure.\nRecent utilization sample: CPU 4%. This sample does not release reserved CPU requests.\nNo other nodes exist in this authored case."
+        },
+        {
+          "id": "storage",
+          "label": "Claim and StorageClass status",
+          "command": "kubectl --context arcade-lab -n arcade-batch get pvc; kubectl --context arcade-lab get storageclass; kubectl --context arcade-lab -n arcade-batch describe pvc data",
+          "output": "Namespace arcade-batch: no PersistentVolumeClaims.\nPVC data: NotFound.\nStorageClass arcade-gp3 exists with provisioner ebs.csi.aws.com and WaitForFirstConsumer.\nThe Pod has no claim reference, so this class is not a scheduling dependency for it."
+        },
+        {
+          "id": "source",
+          "label": "Workload's intended configuration",
+          "command": "Inspect the Terraform-owned candidate.yaml and its saved plan (display-only excerpt)",
+          "output": "Terraform-owned workload input (abridged):\n  image: registry.internal.example/training/worker:v2\n  resources:\n    requests: {cpu: '8', memory: 128Mi}\n    limits: {cpu: '8', memory: 256Mi}\n  volumes: []\nRelease workload contract: demonstration worker, measured baseline below 100m, intended request 100m.\nSaved plan created this workload configuration; it did not add nodes. A successful apply did not wait for scheduling."
+        }
+      ],
+      "question": {
+        "prompt": "Which diagnosis and next Terraform change are best supported?",
+        "options": [
+          {
+            "id": "cpu-request",
+            "text": "The Pod asks for more CPU than the existing node can reserve; review and correct its resource request in Terraform source."
+          },
+          {
+            "id": "storage-class",
+            "text": "The claim refers to a nonexistent StorageClass; correct the storage contract through Terraform after checking for data."
+          },
+          {
+            "id": "taint",
+            "text": "A node taint excludes this workload; add a justified toleration in Terraform source."
+          },
+          {
+            "id": "image",
+            "text": "The image cannot be pulled; change the image reference in Terraform source."
+          }
+        ]
+      },
+      "answer": {
+        "optionId": "cpu-request",
+        "explanation": "The scheduler reports Insufficient cpu: this Pod requests 8000m, more than the node's entire 1930m allocatable CPU. Existing reservations further reduce availability. Low current CPU use cannot satisfy a request the scheduler cannot reserve. The Pod has no PVC and the node has no taints, which rules out those two alternatives here. Image availability remains untested, but it cannot explain this recorded scheduling failure because no node has attempted a pull.",
+        "decisiveEvidence": [
+          "pod",
+          "nodes",
+          "storage",
+          "source"
+        ],
+        "repair": "Correct the CPU request in the Terraform-owned workload input after comparing it with the documented workload requirement; this demonstration intends 100m, not eight cores. Review whether its CPU limit also reflects intent. Review and apply the saved Terraform repair plan. Do not add a billable node to conceal a typo, and do not assume 100m is appropriate for a real workload without measurements. No Console or kubectl mutation is needed.",
+        "verification": "This simulation verifies only an evidence-based choice. A live repair needs a scheduled Pod, a successful image pull, a ready rollout, and the mission's real functional request or output. Re-check resource requests and node reservations; keep a bounded wait and inspect new events if the next stage fails. Terraform apply success and a no-change plan do not prove runtime health. Game 11-05 verifies in-cluster Service traffic; it does not prove public internet reachability. Use Game 13's separate external HTTP check when that is a requirement.",
+        "cleanup": "Nothing was provisioned by the drill. For live practice, review and apply the owning workload root's Terraform destroy plan, verify its state and namespace, then follow Game 07 teardown after dependent workloads are cleaned up. Keep the $20 total allowance and us-west-2 preference in mind; do not delete unrelated nodes, namespaces or account resources. Low CPU use does not mean the EKS cluster has stopped billing.",
+        "followUp": "Measurements now show the worker really needs 2500m continuously, and the existing node has 1930m allocatable. How would you explain the capacity tradeoff and the evidence needed before changing the agreed practice budget?"
+      },
+      "provenance": "Authored simulation with invented, abridged observations. No commands are executed and no live AWS or Kubernetes system was observed."
+    },
+    {
+      "id": "pending-pod-b",
+      "kind": "investigation",
+      "title": "A Pod stays Pending — B",
+      "summary": "Separate scheduling constraints from storage and startup failures.",
+      "brief": "The release Pod stays Pending and has not been assigned to a node. The rollout has not completed. You have made no changes yet. Decide what prevents scheduling now, and which source change the available evidence supports.",
+      "minutes": 10,
+      "skills": [
+        "pod-scheduling",
+        "evidence-selection",
+        "terraform-repair"
+      ],
+      "relatedLabs": [
+        "11-incident-gauntlet/scenario-05",
+        "10-ebs-storage",
+        "07-eks-foundation"
+      ],
+      "observations": [
+        {
+          "id": "pod",
+          "label": "Pod scheduling condition and events",
+          "command": "kubectl --context arcade-lab -n arcade-batch describe pod worker-6b7d-abc",
+          "output": "Pod worker-6b7d-abc:\n  Phase: Pending\n  Node: <none>\n  PodScheduled: False\n  Container requests: cpu=100m, memory=128Mi\n  Volume data references PersistentVolumeClaim data\n  Event: FailedScheduling — 0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims.\n  No image pull has been attempted on a node."
+        },
+        {
+          "id": "nodes",
+          "label": "Node capacity, reservations and taints",
+          "command": "kubectl --context arcade-lab describe node worker-1",
+          "output": "Node worker-1:\n  Ready: True\n  Taints: <none>\n  Allocatable: cpu=1930m, memory=3500Mi\n  Allocated requests from already scheduled Pods: cpu=450m, memory=600Mi\n  Allocated limits are a separate accounting measure.\nRecent utilization sample: CPU 4%. This sample does not release reserved CPU requests.\nNo other nodes exist in this authored case."
+        },
+        {
+          "id": "storage",
+          "label": "Claim and StorageClass status",
+          "command": "kubectl --context arcade-lab -n arcade-batch get pvc; kubectl --context arcade-lab get storageclass; kubectl --context arcade-lab -n arcade-batch describe pvc data",
+          "output": "PVC data:\n  Status: Pending\n  StorageClass: arcade-gp3-fast\n  Volume: <none>\n  Event: ProvisioningFailed — storageclass.storage.k8s.io 'arcade-gp3-fast' not found\nExisting StorageClass arcade-gp3:\n  provisioner: ebs.csi.aws.com\n  volumeBindingMode: WaitForFirstConsumer\n  reclaimPolicy: Delete\n  parameters: {type: gp3, encrypted: 'true'}\nNo class named arcade-gp3-fast exists. The claim has never bound in this authored case; no PV or volume handle is recorded."
+        },
+        {
+          "id": "source",
+          "label": "Workload's intended configuration",
+          "command": "Inspect the Terraform-owned candidate.yaml and its saved plan (display-only excerpt)",
+          "output": "Terraform-owned workload input (abridged):\n  resources.requests: {cpu: 100m, memory: 128Mi}\n  volumeMounts: [{name: data, mountPath: /data}]\n  claimName: data\n  PersistentVolumeClaim data: {storageClassName: arcade-gp3-fast, storage: 1Gi}\n  StorageClass owned by this workload: arcade-gp3\nRelease workload contract: an empty demonstration data directory; no application data exists yet. The two class names should identify the same storage contract."
+        }
+      ],
+      "question": {
+        "prompt": "Which diagnosis and next Terraform change are best supported?",
+        "options": [
+          {
+            "id": "cpu-request",
+            "text": "The Pod asks for more CPU than the existing node can reserve; review and correct its resource request in Terraform source."
+          },
+          {
+            "id": "storage-class",
+            "text": "The claim refers to a nonexistent StorageClass; correct the storage contract through Terraform after checking for data."
+          },
+          {
+            "id": "taint",
+            "text": "A node taint excludes this workload; add a justified toleration in Terraform source."
+          },
+          {
+            "id": "image",
+            "text": "The image cannot be pulled; change the image reference in Terraform source."
+          }
+        ]
+      },
+      "answer": {
+        "optionId": "storage-class",
+        "explanation": "The Pod needs PVC data, whose events name a nonexistent StorageClass: arcade-gp3-fast. Terraform's intended class is arcade-gp3. The Pod's 100m CPU request fits the visible node reservations, and no taint blocks it. WaitForFirstConsumer can legitimately delay binding, but it is configured on a different class; it does not explain the explicit class-not-found event. No image pull has occurred, so an image change does not address the current blocker. Healthy controller Pods alone would not prove this claim can provision storage.",
+        "decisiveEvidence": [
+          "pod",
+          "nodes",
+          "storage",
+          "source"
+        ],
+        "repair": "Align the claim and intended StorageClass in Terraform-owned source. storageClassName is normally immutable on an existing claim: first verify binding, volume identity and data ownership. This authored claim is empty and unbound; use the live mission's reviewed Terraform remove-and-recreate workflow if replacement is required, preserving controller availability. Do not delete a bound claim as a diagnostic shortcut. A correct class name may reveal a later CSI permission or attachment failure; it does not pre-approve the next apply.",
+        "verification": "These simulated observations do not establish whether storage exists in your account. Live proof needs the expected claim Bound to a PV, a scheduled and ready writer, the expected encrypted gp3 EBS volume in the correct account and region, and a marker that survives Terraform-managed writer replacement while the PV identity stays the same. Inspect provisioning and attachment events if binding still stalls. A Bound PVC alone is not persistence proof, and successful apply is not deletion or cost proof. Game 10 has no internet-facing endpoint; persistence checks cannot establish public internet reachability.",
+        "cleanup": "The simulation creates no disk. In Game 10, destroy the workload through its Terraform root while CSI and its permissions still exist. Record any volume ID, wait for the owned EBS volume to be absent in AWS, then remove the add-on and finally the foundation when dependencies allow. The dynamically provisioned PV and disk are not directly in the workload's Terraform state, so an empty state alone is insufficient. Preserve unrelated shared-account resources; keep the $20 total allowance and us-west-2 preference.",
+        "followUp": "The claim is now Bound, contains irreplaceable data, and its PV uses Retain. Which parts of the proposed repair and cleanup must change, and what evidence would you require before approving any replacement?"
+      },
+      "provenance": "Authored simulation with invented, abridged observations. No commands are executed and no live AWS or Kubernetes system was observed."
+    }
+  ]
+}
