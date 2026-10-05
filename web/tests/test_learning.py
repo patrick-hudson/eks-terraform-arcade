@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,6 +15,27 @@ class LearningCatalogTests(unittest.TestCase):
     def setUp(self):
         self.catalog = LearningCatalog(ROOT)
         self.raw = json.loads((ROOT / "web/playbooks.json").read_text())
+
+    def test_command_cards_accept_only_the_activated_lab_context(self):
+        guarded = []
+        for lesson in self.raw.values():
+            for stage in lesson['stages']:
+                for command in stage['commands']:
+                    code = command['code']
+                    marker = '  : "${LAB_KUBE_CONTEXT:?'
+                    if marker in code and 'if [ "$LAB_KUBE_CONTEXT" != arcade-lab ]' in code:
+                        guard = code[code.index(marker):].split('  fi', 1)[0] + '  fi\n'
+                        guarded.append(guard)
+        self.assertTrue(guarded)
+        for guard in set(guarded):
+            for context, expected in [('arcade-lab', 0), ('arcade-123456789012-demo-arcade', 0), ('production', 1)]:
+                result = subprocess.run(['bash', '-c', 'set -eu\n' + guard],
+                    env={'LAB_KUBE_CONTEXT': context, 'TF_VAR_expected_account_id': '123456789012', 'TF_VAR_cluster_name': 'demo-arcade'},
+                    capture_output=True, text=True)
+                self.assertEqual(result.returncode, expected, result.stderr)
+        for number in ('07','08','09','10','11','12'):
+            readme = next((ROOT / 'labs').glob(number + '-*/README.md')).read_text()
+            self.assertIn('export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"', readme)
 
     def test_all_twenty_four_lessons_have_complete_learning_contracts(self):
         readmes = {str(p.parent.relative_to(ROOT / "labs")) for p in (ROOT / "labs").rglob("README.md")}

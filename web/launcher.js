@@ -20,7 +20,7 @@
       const recipe=await load(labId);
       if(!target.isConnected)return;
       let mode=selections.get(labId)||L.defaultMode(recipe);
-      const prerequisites=()=>recipe.prerequisites.length?`<div class="launch-prerequisites"><span>Prepare first</span>${recipe.prerequisites.map(id=>`<a href="${C.labRoute(id)}">Lab ${esc(id.slice(0,2))} ${icon('arrow')}</a>`).join('')}</div>`:'';
+      const prerequisites=()=>recipe.environmentPrerequisites.length?`<div class="launch-prerequisites"><span>Prepare first</span>${recipe.environmentPrerequisites.map(id=>`<a href="${C.labRoute(id)}">Lab ${esc(id.slice(0,2))} ${icon('arrow')}</a>`).join('')}</div>`:'';
       function render() {
         if(!target.isConnected)return;
         const runbook=recipe.kind==='runbook', command=L.commands(recipe,mode);

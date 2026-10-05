@@ -272,3 +272,16 @@ class LauncherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class EnvironmentPrerequisiteTests(unittest.TestCase):
+    def test_curriculum_prerequisites_are_not_running_dependencies(self):
+        recipes = manager.load_recipes(Path(__file__).resolve().parents[2])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '02')), [])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '12')), ['07-eks-foundation'])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '13')), ['07-eks-foundation'])
+
+    def test_public_launch_uses_environment_dependencies(self):
+        from web.launch import public_recipe
+        root = Path(__file__).resolve().parents[2]
+        self.assertEqual(public_recipe(root, '02-remote-state')['environmentPrerequisites'], [])
+        self.assertEqual(public_recipe(root, '12-capstone')['environmentPrerequisites'], ['07-eks-foundation'])

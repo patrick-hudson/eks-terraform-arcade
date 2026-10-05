@@ -1305,7 +1305,7 @@
         "commands": [
           {
             "label": "Classify node and add-on health",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -L role -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n kube-system get pods\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -L role -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n kube-system get pods\n)",
             "expected": "Use the runbook’s configured context. Separate missing/NotReady nodes from unhealthy system workloads before changing the application."
           }
         ],
@@ -1348,7 +1348,7 @@
         "commands": [
           {
             "label": "Verify authorization and all four add-ons",
-            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_ROOT:?Complete docs/setup.md and set LAB_ROOT to the kit root}\"\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  CLUSTER_NAME=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\n  : \"${CLUSTER_NAME:?Game 07 cluster output is unavailable}\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" auth can-i create deployments --all-namespaces\n  for LAB_ADDON in vpc-cni kube-proxy coredns eks-pod-identity-agent; do\n    LAB_ADDON_STATUS=\"$(aws eks describe-addon --cluster-name \"$CLUSTER_NAME\" \\\n      --addon-name \"$LAB_ADDON\" --region \"$AWS_REGION\" \\\n      --query 'addon.{name:addonName,status:status,issues:health.issues}' --output json)\"\n    printf '%s\\n' \"$LAB_ADDON_STATUS\"\n    jq -e '.status == \"ACTIVE\" and ((.issues // []) | length == 0)' <<< \"$LAB_ADDON_STATUS\"\n  done\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_ROOT:?Complete docs/setup.md and set LAB_ROOT to the kit root}\"\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  CLUSTER_NAME=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\n  : \"${CLUSTER_NAME:?Game 07 cluster output is unavailable}\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" auth can-i create deployments --all-namespaces\n  for LAB_ADDON in vpc-cni kube-proxy coredns eks-pod-identity-agent; do\n    LAB_ADDON_STATUS=\"$(aws eks describe-addon --cluster-name \"$CLUSTER_NAME\" \\\n      --addon-name \"$LAB_ADDON\" --region \"$AWS_REGION\" \\\n      --query 'addon.{name:addonName,status:status,issues:health.issues}' --output json)\"\n    printf '%s\\n' \"$LAB_ADDON_STATUS\"\n    jq -e '.status == \"ACTIVE\" and ((.issues // []) | length == 0)' <<< \"$LAB_ADDON_STATUS\"\n  done\n)",
             "expected": "The administrator receives yes. Each of the four add-ons reports ACTIVE, an empty issues array and true; the block stops on a failed AWS request or health assertion. Complete the remaining node, agent rollout and Terraform checks in the runbook."
           }
         ],
@@ -1482,7 +1482,7 @@
         "commands": [
           {
             "label": "Inspect the traffic boundary",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app describe pods -l app=arcade-web\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app logs deployment/web --tail=30\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app get endpointslices -l kubernetes.io/service-name=web -o yaml\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app describe pods -l app=arcade-web\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app logs deployment/web --tail=30\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-app get endpointslices -l kubernetes.io/service-name=web -o yaml\n)",
             "expected": "Compare actual HTTP results with probe configuration and endpoint readiness; capture the mismatch before editing."
           },
           {
@@ -1664,7 +1664,7 @@
         "commands": [
           {
             "label": "Compare workload identity with the association",
-            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_ROOT:?Complete docs/setup.md and set LAB_ROOT to the kit root}\"\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\n  : \"${TF_VAR_cluster_name:?Game 07 cluster output is unavailable}\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-identity get pod -l job-name=reader -o yaml\n  aws eks list-pod-identity-associations --cluster-name \"$TF_VAR_cluster_name\" --region \"$AWS_REGION\"\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_ROOT:?Complete docs/setup.md and set LAB_ROOT to the kit root}\"\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\n  : \"${TF_VAR_cluster_name:?Game 07 cluster output is unavailable}\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-identity get pod -l job-name=reader -o yaml\n  aws eks list-pod-identity-associations --cluster-name \"$TF_VAR_cluster_name\" --region \"$AWS_REGION\"\n)",
             "expected": "After the runbook exports variables, compare the actual Pod’s serviceAccountName with the namespace/service-account/cluster tuple. Do not copy credentials out of the Pod."
           },
           {
@@ -1712,7 +1712,7 @@
         "commands": [
           {
             "label": "Read the repaired Job outcome",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-identity logs job/reader\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-identity logs job/reader\n)",
             "expected": "After the documented repair/recreation, require the role, successful fixture read, intended AccessDenied and PASS together."
           }
         ],
@@ -1846,7 +1846,7 @@
         "commands": [
           {
             "label": "Locate the provisioning boundary",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-storage describe pvc data\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get storageclass arcade-gp3 -o yaml\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get csidrivers\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-storage describe pvc data\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get storageclass arcade-gp3 -o yaml\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get csidrivers\n)",
             "expected": "Compare the requesting StorageClass with the registered controller. Pending alone does not identify the failed layer."
           }
         ],
@@ -2017,7 +2017,7 @@
         "commands": [
           {
             "label": "Capture current state",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  : \"${NS:?Run the selected incident README first to set NS}\"\n  case \"$NS\" in\n    arcade-incident-0[1-8]) ;;\n    *) printf 'Stop: NS must be one of arcade-incident-01 through arcade-incident-08.\\n' >&2; exit 1 ;;\n  esac\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n \"$NS\" get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n \"$NS\" get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  : \"${NS:?Run the selected incident README first to set NS}\"\n  case \"$NS\" in\n    arcade-incident-0[1-8]) ;;\n    *) printf 'Stop: NS must be one of arcade-incident-01 through arcade-incident-08.\\n' >&2; exit 1 ;;\n  esac\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n \"$NS\" get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n \"$NS\" get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Set NS with the selected scenario’s complete setup first. Use this evidence to choose the next diagnostic layer."
           }
         ],
@@ -2192,7 +2192,7 @@
         "commands": [
           {
             "label": "Read the session baseline",
-            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  aws sts get-caller-identity --region \"$AWS_REGION\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get pods -A\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${AWS_REGION:?Complete docs/setup.md and set AWS_REGION}\"\n  : \"${TF_VAR_expected_account_id:?Set the intended sandbox account ID from docs/setup.md}\"\n  if [ \"$(aws sts get-caller-identity --region \"$AWS_REGION\" --query Account --output text)\" != \"$TF_VAR_expected_account_id\" ]; then\n    printf 'Stop: AWS credentials do not match the intended sandbox account.\\n' >&2\n    exit 1\n  fi\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  aws sts get-caller-identity --region \"$AWS_REGION\"\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" get pods -A\n)",
             "expected": "After the capstone exports its context, record the intended account, Ready foundation and starting workload inventory."
           }
         ],
@@ -2362,7 +2362,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -2410,7 +2410,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -2549,7 +2549,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -2597,7 +2597,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -2736,7 +2736,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -2784,7 +2784,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -2923,7 +2923,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -2971,7 +2971,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -3110,7 +3110,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -3158,7 +3158,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -3297,7 +3297,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 get jobs,pods\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 logs job/inspect\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 get jobs,pods\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 logs job/inspect\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -3345,7 +3345,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 wait --for=condition=complete job/inspect --timeout=120s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 logs job/inspect\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 wait --for=condition=complete job/inspect --timeout=120s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 logs job/inspect\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -3484,7 +3484,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get events --sort-by=.metadata.creationTimestamp\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get pods -o wide\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 describe pods -l app=incident\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get events --sort-by=.metadata.creationTimestamp\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -3532,7 +3532,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get pods -o wide\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],
@@ -3671,7 +3671,7 @@
         "commands": [
           {
             "label": "Gather the first evidence",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pdb app\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pods -o wide\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pdb app\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pods -o wide\n)",
             "expected": "Read state, events or task output to classify the failure. A setup/network failure can obscure the intended incident."
           },
           {
@@ -3719,7 +3719,7 @@
         "commands": [
           {
             "label": "Check the repaired workload",
-            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and set LAB_KUBE_CONTEXT=arcade-lab}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ]; then\n    printf 'Stop: this card requires LAB_KUBE_CONTEXT=arcade-lab.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pods,pdb\n)",
+            "code": "(\n  set -euo pipefail\n  : \"${LAB_KUBE_CONTEXT:?Complete Game 07 and activate its lab context}\"\n  if [ \"$LAB_KUBE_CONTEXT\" != arcade-lab ] && [ \"$LAB_KUBE_CONTEXT\" != \"arcade-${TF_VAR_expected_account_id:-unset}-${TF_VAR_cluster_name:-unset}\" ]; then\n    printf 'Stop: activate the intended Game 07 lab context before using this card.\\n' >&2\n    exit 1\n  fi\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 rollout status deployment/app --timeout=180s\n  kubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pods,pdb\n)",
             "expected": "Run only after the repair and any required Job recreation or targeted operation described in the source. Then complete all functional checks."
           }
         ],

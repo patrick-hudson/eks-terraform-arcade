@@ -86,6 +86,8 @@ def load_recipes(root: Path) -> list[dict]:
             raise LauncherError(f"Unknown preparation mode: {recipe['id']}")
         if not isinstance(recipe.get("prerequisites"), list) or not all(isinstance(x, str) for x in recipe["prerequisites"]):
             raise LauncherError(f"Invalid prerequisite list: {recipe['id']}")
+        if "environmentPrerequisites" in recipe and (not isinstance(recipe["environmentPrerequisites"], list) or not all(isinstance(x, str) for x in recipe["environmentPrerequisites"])):
+            raise LauncherError(f"Invalid environment prerequisite list: {recipe['id']}")
         if recipe["kind"] == "runbook":
             if modes or recipe.get("runDirectory") is not None:
                 raise LauncherError("Runbook recipes cannot create workspaces.")
@@ -125,7 +127,7 @@ def load_recipes(root: Path) -> list[dict]:
                     raise LauncherError(f"Invalid {key} commands: {recipe['id']}")
     canonical_ids = {recipe["id"] for recipe in recipes}
     for recipe in recipes:
-        if not set(recipe["prerequisites"]) <= canonical_ids:
+        if not set(recipe["prerequisites"]) <= canonical_ids or not set(environment_prerequisites(recipe)) <= canonical_ids:
             raise LauncherError(f"Unknown prerequisite: {recipe['id']}")
     return recipes
 
@@ -214,8 +216,15 @@ def prepare(root: Path, recipe: dict, requested_mode: str | None) -> tuple[Path,
     return directory, mode, True
 
 
+def environment_prerequisites(recipe: dict) -> list[str]:
+    """Running infrastructure dependencies, distinct from prior learning."""
+    return recipe.get("environmentPrerequisites", recipe["prerequisites"])
+
+
 def print_prerequisites(root: Path, recipe: dict, recipes: list[dict]) -> None:
     """Show dependency order without preparing or checking any environment."""
+    if recipe["alias"] == "12":
+        print("Capstone start: retain Game 07, but destroy earlier exercise workloads through their own Terraform first.")
     ordered, seen = [], {recipe["id"]}
 
     def visit(identifier: str) -> None:
@@ -223,11 +232,11 @@ def print_prerequisites(root: Path, recipe: dict, recipes: list[dict]) -> None:
             return
         seen.add(identifier)
         prerequisite = find_recipe(recipes, identifier)
-        for dependency in prerequisite["prerequisites"]:
+        for dependency in environment_prerequisites(prerequisite):
             visit(dependency)
         ordered.append(prerequisite)
 
-    for identifier in recipe["prerequisites"]:
+    for identifier in environment_prerequisites(recipe):
         visit(identifier)
     if not ordered:
         print("\nPrerequisite Terraform environments: none declared.")
@@ -354,6 +363,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
         recipes = load_recipes(root)
         if args.command == "labs":
             public = [{**{k: r[k] for k in ("id", "alias", "title", "kind", "runDirectory", "prerequisites", "cost")},
+                       "environmentPrerequisites": environment_prerequisites(r),
                        "modes": {name: {k: mode[k] for k in ("label", "description")} for name, mode in r["modes"].items()}} for r in recipes]
             if args.json:
                 print(json.dumps({"schemaVersion": 1, "recipes": public}, indent=2))

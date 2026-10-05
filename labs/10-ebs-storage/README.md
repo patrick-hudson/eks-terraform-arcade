@@ -12,7 +12,7 @@ Requirements: a gp3 StorageClass with encryption, `WaitForFirstConsumer`, reclai
 
 ```bash
 : "${LAB_ROOT:?Complete docs/setup.md first}"
-export LAB_KUBE_CONTEXT=arcade-lab
+export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"
 export TF_VAR_cluster_name="$(terraform -chdir="$LAB_ROOT/run/07-eks-foundation" output -raw cluster_name)"
 export AWS_REGION="$(terraform -chdir="$LAB_ROOT/run/07-eks-foundation" output -raw region)"
 export TF_VAR_region="$AWS_REGION"

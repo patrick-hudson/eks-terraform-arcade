@@ -8,7 +8,7 @@ Use a distinct lab ID and reviewed plans in your intended account, the same `LAB
 
 ```bash
 : "${LAB_ROOT:?Set the absolute extracted kit path}"
-export LAB_KUBE_CONTEXT=arcade-lab
+export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"
 aws sts get-caller-identity
 kubectl --context "$LAB_KUBE_CONTEXT" get nodes -o wide
 kubectl --context "$LAB_KUBE_CONTEXT" get pods -A

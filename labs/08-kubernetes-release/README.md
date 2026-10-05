@@ -8,7 +8,7 @@ You have a release manifest from another engineer. A readiness probe decides whe
 
 ```bash
 : "${LAB_ROOT:?Complete docs/setup.md first}"
-export LAB_KUBE_CONTEXT=arcade-lab
+export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"
 export TF_VAR_aws_profile="${AWS_PROFILE:?Set the authenticated profile}"
 : "${TF_VAR_expected_account_id:?Set the intended account ID}"
 export TF_VAR_cluster_name="$(terraform -chdir="$LAB_ROOT/run/07-eks-foundation" output -raw cluster_name)"

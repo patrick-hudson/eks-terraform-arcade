@@ -27,7 +27,7 @@ Before the first incident:
 
 ```bash
 : "${LAB_ROOT:?Set LAB_ROOT to the extracted kit directory}"
-export LAB_KUBE_CONTEXT=arcade-lab
+export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"
 kubectl --context "$LAB_KUBE_CONTEXT" get nodes
 kubectl --context "$LAB_KUBE_CONTEXT" get pods -A
 ```

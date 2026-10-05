@@ -350,7 +350,8 @@
             }
           ]
         }
-      }
+      },
+      "environmentPrerequisites": []
     },
     {
       "id": "03-vpc-routing",
@@ -2293,7 +2294,10 @@
         "11-incident-gauntlet"
       ],
       "cost": "Uses the whole-curriculum $20 allowance; reuse 07 and follow ordered teardown after 08–11.",
-      "modes": {}
+      "modes": {},
+      "environmentPrerequisites": [
+        "07-eks-foundation"
+      ]
     },
     {
       "id": "13-public-access",

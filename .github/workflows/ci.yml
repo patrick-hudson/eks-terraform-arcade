@@ -68,7 +68,7 @@ jobs:
                       subprocess.run(['bash', '-n'], input=step['command'], text=True, check=True)
           tracked = subprocess.check_output(['git', 'ls-files', '-z'], text=True).split('\0')
           for path in tracked:
-              if path.endswith('.sh') or path == 'scripts/arcade':
+              if path.endswith('.sh') or path in {'arcade', 'scripts/arcade'}:
                   subprocess.run(['bash', '-n', path], check=True)
           print(f'Validated {len(recipes)} recipes and tracked shell scripts.')
           PY
@@ -78,6 +78,7 @@ jobs:
           terraform fmt -check -recursive modules
           terraform -chdir=labs/00-terraform-contracts/solution init -backend=false -input=false
           terraform -chdir=labs/00-terraform-contracts/solution test
+          python3 scripts/tests/verify_plan_review_terraform.py
       - name: Validate and test mocked Kubernetes plans
         run: |
           terraform -chdir=modules/kubernetes-exercise init -backend=false -input=false -lockfile=readonly

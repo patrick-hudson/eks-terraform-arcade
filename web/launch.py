@@ -17,6 +17,7 @@ def public_recipe(root, lab_id):
         raise ValueError("Unknown mission")
     public = {key: recipe[key] for key in (
         "id", "alias", "title", "kind", "runDirectory", "prerequisites", "cost")}
+    public["environmentPrerequisites"] = recipe.get("environmentPrerequisites", recipe["prerequisites"])
     public["modes"] = {key: {field: mode[field] for field in ("label", "description")}
                        for key, mode in recipe["modes"].items()}
     return public

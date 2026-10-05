@@ -21,7 +21,7 @@ First complete [setup](../../docs/setup.md). Use the IAM role/user ARN behind yo
 
 ```bash
 : "${LAB_ROOT:?Complete docs/setup.md first}"
-export LAB_KUBE_CONTEXT=arcade-lab
+export LAB_KUBE_CONTEXT="${LAB_KUBE_CONTEXT:-arcade-lab}"
 # Set these real values; never copy an example account or IP.
 : "${TF_VAR_admin_principal_arn:?Export your permanent IAM role/user ARN from setup}"
 export TF_VAR_allowed_cidr="$(curl -fsS https://checkip.amazonaws.com)/32"
