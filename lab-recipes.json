@@ -1,0 +1,2468 @@
+{
+  "schemaVersion": 1,
+  "recipes": [
+    {
+      "id": "00-terraform-contracts",
+      "alias": "00",
+      "title": "Terraform contract clinic",
+      "kind": "terraform",
+      "runDirectory": "00-contracts",
+      "prerequisites": [],
+      "cost": "$0; local terraform_data resources only, no AWS authentication.",
+      "modes": {
+        "starter": {
+          "label": "Broken contract",
+          "description": "Broken Terraform plus acceptance tests; fix the type/identity contract.",
+          "files": [
+            {
+              "source": "labs/00-terraform-contracts/starter/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/00-terraform-contracts/starter/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "labs/00-terraform-contracts/solution/tests/contracts.tftest.hcl",
+              "destination": "tests/contracts.tftest.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Read the input contract",
+              "command": "cat \"$LAB_ROOT/labs/00-terraform-contracts/README.md\""
+            },
+            {
+              "title": "Reproduce the first failure",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform init\nterraform plan\n# The starter plan failure is deliberate. Record the error before editing.\n${EDITOR:-vi} main.tf\nterraform fmt\nterraform validate\nterraform test"
+            },
+            {
+              "title": "Review and apply the local-only plan",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform plan -out=lab.tfplan\nterraform show lab.tfplan\nterraform apply lab.tfplan\nterraform output -json allocations | jq -e '. == {\"api\":256,\"worker\":512}'\nterraform state list"
+            },
+            {
+              "title": "Prove stable resource identity",
+              "command": "cat \"$LAB_ROOT/labs/00-terraform-contracts/README.md\"\n# Run the reordering experiment; the final plan must return exit status 0."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Remove only the local Terraform objects",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform destroy\nterraform state list\n# No AWS resources were involved."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference solution",
+          "description": "Copies the complete answer for guided walkthroughs; tests remain included.",
+          "files": [
+            {
+              "source": "labs/00-terraform-contracts/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/00-terraform-contracts/solution/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "labs/00-terraform-contracts/solution/tests/contracts.tftest.hcl",
+              "destination": "tests/contracts.tftest.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Read the input contract",
+              "command": "cat \"$LAB_ROOT/labs/00-terraform-contracts/README.md\""
+            },
+            {
+              "title": "Run the reference contract suite",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform init\nterraform plan\nterraform fmt\nterraform validate\nterraform test"
+            },
+            {
+              "title": "Review and apply the local-only plan",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform plan -out=lab.tfplan\nterraform show lab.tfplan\nterraform apply lab.tfplan\nterraform output -json allocations | jq -e '. == {\"api\":256,\"worker\":512}'\nterraform state list"
+            },
+            {
+              "title": "Prove stable resource identity",
+              "command": "cat \"$LAB_ROOT/labs/00-terraform-contracts/README.md\"\n# Run the reordering experiment; the final plan must return exit status 0."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Remove only the local Terraform objects",
+              "command": "cd \"$LAB_ROOT/run/00-contracts\"\nterraform destroy\nterraform state list\n# No AWS resources were involved."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "01-private-s3",
+      "alias": "01",
+      "title": "Private artifact vault",
+      "kind": "terraform",
+      "runDirectory": "01-private-s3",
+      "prerequisites": [],
+      "cost": "Budget $0.05 for tiny objects and a short session; storage and requests are billable.",
+      "modes": {
+        "starter": {
+          "label": "Build from the contract",
+          "description": "Provider guard and resource checklist; author the resources.",
+          "files": [
+            {
+              "source": "labs/01-private-s3/starter/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/01-private-s3/starter/providers.tf",
+              "destination": "providers.tf"
+            },
+            {
+              "source": "labs/01-private-s3/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission and author the working files",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\ncd \"$LAB_ROOT/run/01-private-s3\"\n${EDITOR:-vi} main.tf"
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Run mission-specific acceptance and capture evidence",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\n# Follow the verification section; a successful apply alone is not acceptance."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nexport BUCKET=\"$(terraform output -raw bucket_name)\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws s3api wait bucket-not-exists --bucket \"$BUCKET\""
+            },
+            {
+              "title": "Verify the exact AWS resource disappeared",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\n# Use the teardown section and captured bucket/VPC ID, including partial-apply recovery."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference architecture",
+          "description": "Copies the working Terraform answer; explain and verify each control.",
+          "files": [
+            {
+              "source": "labs/01-private-s3/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/01-private-s3/solution/providers.tf",
+              "destination": "providers.tf"
+            },
+            {
+              "source": "labs/01-private-s3/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission before reviewing the reference implementation",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\ncd \"$LAB_ROOT/run/01-private-s3\""
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Run mission-specific acceptance and capture evidence",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\n# Follow the verification section; a successful apply alone is not acceptance."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nexport BUCKET=\"$(terraform output -raw bucket_name)\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/01-private-s3\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws s3api wait bucket-not-exists --bucket \"$BUCKET\""
+            },
+            {
+              "title": "Verify the exact AWS resource disappeared",
+              "command": "cat \"$LAB_ROOT/labs/01-private-s3/README.md\"\n# Use the teardown section and captured bucket/VPC ID, including partial-apply recovery."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "02-remote-state",
+      "alias": "02",
+      "title": "Two writers, one state",
+      "kind": "terraform",
+      "runDirectory": "02-remote-state",
+      "prerequisites": [
+        "01-private-s3"
+      ],
+      "cost": "Budget $0.10 for one versioned S3 backend and small request/storage volume.",
+      "modes": {
+        "starter": {
+          "label": "Build both Terraform roots",
+          "description": "Separate bootstrap and workload roots; author resource contracts.",
+          "files": [
+            {
+              "source": "labs/02-remote-state/starter/bootstrap/main.tf",
+              "destination": "bootstrap/main.tf"
+            },
+            {
+              "source": "labs/02-remote-state/starter/bootstrap/providers.tf",
+              "destination": "bootstrap/providers.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/bootstrap/.terraform.lock.hcl",
+              "destination": "bootstrap/.terraform.lock.hcl"
+            },
+            {
+              "source": "labs/02-remote-state/starter/workload/backend.tf",
+              "destination": "workload/backend.tf"
+            },
+            {
+              "source": "labs/02-remote-state/starter/workload/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "labs/02-remote-state/starter/workload/providers.tf",
+              "destination": "workload/providers.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/workload/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account and read the two-state contract",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\ncat \"$LAB_ROOT/labs/02-remote-state/README.md\""
+            },
+            {
+              "title": "Prepare and review the backend bucket",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/bootstrap\"\n${EDITOR:-vi} main.tf\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=bootstrap.tfplan\nterraform show bootstrap.tfplan"
+            },
+            {
+              "title": "Apply the reviewed bootstrap plan",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/bootstrap\"\nterraform apply bootstrap.tfplan\nexport STATE_BUCKET=\"$(terraform output -raw bucket_name)\""
+            },
+            {
+              "title": "Configure the workload backend using the actual bucket",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/workload\"\n${EDITOR:-vi} main.tf\n: \"${STATE_BUCKET:?Read the bootstrap bucket_name output first}\"\n: \"${AWS_REGION:?Set the same region as bootstrap}\"\n: \"${TF_VAR_expected_account_id:?Set the intended account}\"\ncat > backend.hcl <<EOF\nbucket              = \"${STATE_BUCKET}\"\nkey                 = \"workload/terraform.tfstate\"\nregion              = \"${AWS_REGION}\"\nencrypt             = true\nuse_lockfile        = true\nallowed_account_ids = [\"${TF_VAR_expected_account_id}\"]\nEOF\nterraform init -lockfile=readonly -backend-config=backend.hcl\nterraform fmt\nterraform validate\nterraform plan -out=workload.tfplan\nterraform show workload.tfplan"
+            },
+            {
+              "title": "Apply the reviewed workload plan, then run lock contention",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/workload\"\nterraform apply workload.tfplan\n# The local 45-second delay is intentional.\ncat \"$LAB_ROOT/labs/02-remote-state/README.md\"\n# Follow the two-process contention experiment. Never disable or manually remove its lock."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Retire the workload and migrate its empty state before deleting the bucket",
+              "command": "cat \"$LAB_ROOT/labs/02-remote-state/README.md\"\n# Follow the complete Teardown order section: workload destroy, state pull,\n# explicit local backend migration, empty-state checks, then bootstrap destroy.\n# Do not run bootstrap destroy while the workload still depends on its backend."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference backend and workload",
+          "description": "Copies both reference roots; initialization and cleanup remain deliberately ordered.",
+          "files": [
+            {
+              "source": "labs/02-remote-state/solution/bootstrap/main.tf",
+              "destination": "bootstrap/main.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/bootstrap/providers.tf",
+              "destination": "bootstrap/providers.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/bootstrap/.terraform.lock.hcl",
+              "destination": "bootstrap/.terraform.lock.hcl"
+            },
+            {
+              "source": "labs/02-remote-state/solution/workload/backend.tf",
+              "destination": "workload/backend.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/workload/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/workload/providers.tf",
+              "destination": "workload/providers.tf"
+            },
+            {
+              "source": "labs/02-remote-state/solution/workload/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account and read the two-state contract",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\ncat \"$LAB_ROOT/labs/02-remote-state/README.md\""
+            },
+            {
+              "title": "Prepare and review the backend bucket",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/bootstrap\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=bootstrap.tfplan\nterraform show bootstrap.tfplan"
+            },
+            {
+              "title": "Apply the reviewed bootstrap plan",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/bootstrap\"\nterraform apply bootstrap.tfplan\nexport STATE_BUCKET=\"$(terraform output -raw bucket_name)\""
+            },
+            {
+              "title": "Configure the workload backend using the actual bucket",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/workload\"\n: \"${STATE_BUCKET:?Read the bootstrap bucket_name output first}\"\n: \"${AWS_REGION:?Set the same region as bootstrap}\"\n: \"${TF_VAR_expected_account_id:?Set the intended account}\"\ncat > backend.hcl <<EOF\nbucket              = \"${STATE_BUCKET}\"\nkey                 = \"workload/terraform.tfstate\"\nregion              = \"${AWS_REGION}\"\nencrypt             = true\nuse_lockfile        = true\nallowed_account_ids = [\"${TF_VAR_expected_account_id}\"]\nEOF\nterraform init -lockfile=readonly -backend-config=backend.hcl\nterraform fmt\nterraform validate\nterraform plan -out=workload.tfplan\nterraform show workload.tfplan"
+            },
+            {
+              "title": "Apply the reviewed workload plan, then run lock contention",
+              "command": "cd \"$LAB_ROOT/run/02-remote-state/workload\"\nterraform apply workload.tfplan\n# The local 45-second delay is intentional.\ncat \"$LAB_ROOT/labs/02-remote-state/README.md\"\n# Follow the two-process contention experiment. Never disable or manually remove its lock."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Retire the workload and migrate its empty state before deleting the bucket",
+              "command": "cat \"$LAB_ROOT/labs/02-remote-state/README.md\"\n# Follow the complete Teardown order section: workload destroy, state pull,\n# explicit local backend migration, empty-state checks, then bootstrap destroy.\n# Do not run bootstrap destroy while the workload still depends on its backend."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "03-vpc-routing",
+      "alias": "03",
+      "title": "Routing without a surprise NAT bill",
+      "kind": "terraform",
+      "runDirectory": "03-vpc-routing",
+      "prerequisites": [],
+      "cost": "$0 standing charge for the specified VPC/subnet/route design; no NAT, instances, or public IPv4 allocations.",
+      "modes": {
+        "starter": {
+          "label": "Build from the contract",
+          "description": "Provider guard and resource checklist; author the resources.",
+          "files": [
+            {
+              "source": "labs/03-vpc-routing/starter/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/03-vpc-routing/starter/providers.tf",
+              "destination": "providers.tf"
+            },
+            {
+              "source": "labs/03-vpc-routing/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission and author the working files",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\ncd \"$LAB_ROOT/run/03-vpc-routing\"\n${EDITOR:-vi} main.tf"
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Run mission-specific acceptance and capture evidence",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\n# Follow the verification section; a successful apply alone is not acceptance."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nexport VPC_ID=\"$(terraform output -raw vpc_id)\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws ec2 describe-vpcs --filters \"Name=vpc-id,Values=$VPC_ID\" | jq -e '.Vpcs | length == 0'"
+            },
+            {
+              "title": "Verify the exact AWS resource disappeared",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\n# Use the teardown section and captured bucket/VPC ID, including partial-apply recovery."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference architecture",
+          "description": "Copies the working Terraform answer; explain and verify each control.",
+          "files": [
+            {
+              "source": "labs/03-vpc-routing/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/03-vpc-routing/solution/providers.tf",
+              "destination": "providers.tf"
+            },
+            {
+              "source": "labs/03-vpc-routing/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission before reviewing the reference implementation",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\ncd \"$LAB_ROOT/run/03-vpc-routing\""
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Run mission-specific acceptance and capture evidence",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\n# Follow the verification section; a successful apply alone is not acceptance."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nexport VPC_ID=\"$(terraform output -raw vpc_id)\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/03-vpc-routing\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws ec2 describe-vpcs --filters \"Name=vpc-id,Values=$VPC_ID\" | jq -e '.Vpcs | length == 0'"
+            },
+            {
+              "title": "Verify the exact AWS resource disappeared",
+              "command": "cat \"$LAB_ROOT/labs/03-vpc-routing/README.md\"\n# Use the teardown section and captured bucket/VPC ID, including partial-apply recovery."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "04-iam-boundaries",
+      "alias": "04",
+      "title": "Permission to read, permission to fail",
+      "kind": "terraform",
+      "runDirectory": "04-iam-boundaries",
+      "prerequisites": [],
+      "cost": "$0 direct IAM charge; simulation only, no real bucket.",
+      "modes": {
+        "starter": {
+          "label": "Build from the contract",
+          "description": "Task contract, provider guard, and lockfile only; write the implementation yourself.",
+          "files": [
+            {
+              "source": "labs/04-iam-boundaries/starter/TASKS.md",
+              "destination": "TASKS.md"
+            },
+            {
+              "source": "labs/04-iam-boundaries/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/04-iam-boundaries/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Implement the contract before planning",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\ncat TASKS.md\ncat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\n${EDITOR:-vi} main.tf\n# Preserve the deliberately faulty initial behavior described by the mission."
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Trigger the policy evaluation incident",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nROLE_ARN=$(terraform output -raw role_arn)\nBUCKET_ARN=$(terraform output -raw bucket_arn)\naws iam simulate-principal-policy --policy-source-arn \"$ROLE_ARN\"   --action-names s3:GetObject --resource-arns \"$BUCKET_ARN/published/hello.txt\"   --query 'EvaluationResults[].{Decision:EvalDecision,Boundary:PermissionsBoundaryDecisionDetail}'\ncat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\n# Follow all four acceptance pairs; simulator API AccessDenied is an operator setup issue."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nROLE_NAME=$(terraform output -raw role_name)\nBOUNDARY_ARN=$(terraform output -raw boundary_arn)\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws iam get-role --role-name \"$ROLE_NAME\"\naws iam get-policy --policy-arn \"$BOUNDARY_ARN\"\n# Both calls must return NoSuchEntity. AccessDenied does not prove deletion."
+            },
+            {
+              "title": "Verify named-resource absence and partial-apply recovery",
+              "command": "cat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\n# If a partial apply saved no outputs, recover exact names from Terraform state before destruction.\n# Use the Teardown section; retain state until named-resource absence is proved."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference architecture with injected fault",
+          "description": "Copies reference code; the printed plan explicitly injects the initial fault.",
+          "files": [
+            {
+              "source": "labs/04-iam-boundaries/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/04-iam-boundaries/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/04-iam-boundaries/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission before reviewing the reference implementation",
+              "command": "cat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\ncd \"$LAB_ROOT/run/04-iam-boundaries\""
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -var='policy_variant=broken' -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Trigger the policy evaluation incident",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nROLE_ARN=$(terraform output -raw role_arn)\nBUCKET_ARN=$(terraform output -raw bucket_arn)\naws iam simulate-principal-policy --policy-source-arn \"$ROLE_ARN\"   --action-names s3:GetObject --resource-arns \"$BUCKET_ARN/published/hello.txt\"   --query 'EvaluationResults[].{Decision:EvalDecision,Boundary:PermissionsBoundaryDecisionDetail}'\ncat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\n# Follow all four acceptance pairs; simulator API AccessDenied is an operator setup issue."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nROLE_NAME=$(terraform output -raw role_name)\nBOUNDARY_ARN=$(terraform output -raw boundary_arn)\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/04-iam-boundaries\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws iam get-role --role-name \"$ROLE_NAME\"\naws iam get-policy --policy-arn \"$BOUNDARY_ARN\"\n# Both calls must return NoSuchEntity. AccessDenied does not prove deletion."
+            },
+            {
+              "title": "Verify named-resource absence and partial-apply recovery",
+              "command": "cat \"$LAB_ROOT/labs/04-iam-boundaries/README.md\"\n# If a partial apply saved no outputs, recover exact names from Terraform state before destruction.\n# Use the Teardown section; retain state until named-resource absence is proved."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "05-serverless-counter",
+      "alias": "05",
+      "title": "The green deployment that fails at runtime",
+      "kind": "terraform",
+      "runDirectory": "05-serverless-counter",
+      "prerequisites": [],
+      "cost": "Target below $0.10 for ten or fewer invocations; request, storage, and log charges apply.",
+      "modes": {
+        "starter": {
+          "label": "Build from the contract",
+          "description": "Task contract, provider guard, and lockfile only; write the implementation yourself.",
+          "files": [
+            {
+              "source": "labs/05-serverless-counter/starter/TASKS.md",
+              "destination": "TASKS.md"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Implement the contract before planning",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\ncat TASKS.md\ncat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\n${EDITOR:-vi} main.tf handler.py test_handler.py\n# Preserve the deliberately faulty initial behavior described by the mission."
+            },
+            {
+              "title": "Check the handler locally before spending",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\npython3 -m unittest -v\n# Passing local tests do not prove live IAM permissions or DynamoDB atomicity."
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Trigger the intended runtime incident",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nFUNCTION=$(terraform output -raw function_name)\naws lambda wait function-active-v2 --function-name \"$FUNCTION\"\naws lambda invoke --function-name \"$FUNCTION\" --cli-binary-format raw-in-base64-out   --payload '{\"counter\":\"interview\"}' response.json\ncat response.json\n# Inspect FunctionError and the payload, not only Invoke's transport StatusCode.\ncat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\n# Follow investigation and acceptance. Repair through Terraform, then prove both valid and invalid input behavior."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nFUNCTION=$(terraform output -raw function_name)\nTABLE=$(terraform output -raw table_name)\nLOG_GROUP=$(terraform output -raw log_group)\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws dynamodb wait table-not-exists --table-name \"$TABLE\"\naws lambda get-function --function-name \"$FUNCTION\"\naws logs describe-log-groups --log-group-name-prefix \"$LOG_GROUP\" --query 'logGroups[].logGroupName'\n# Required: Lambda ResourceNotFoundException and no exact log-group match."
+            },
+            {
+              "title": "Verify named-resource absence and partial-apply recovery",
+              "command": "cat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\n# If a partial apply saved no outputs, recover exact names from Terraform state before destruction.\n# Use the Teardown section; retain state until named-resource absence is proved."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference architecture with injected fault",
+          "description": "Copies reference code; the printed plan explicitly injects the initial fault.",
+          "files": [
+            {
+              "source": "labs/05-serverless-counter/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/handler.py",
+              "destination": "handler.py"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/test_handler.py",
+              "destination": "test_handler.py"
+            },
+            {
+              "source": "labs/05-serverless-counter/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm account, region, and session identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources."
+            },
+            {
+              "title": "Read the mission before reviewing the reference implementation",
+              "command": "cat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\ncd \"$LAB_ROOT/run/05-serverless-counter\""
+            },
+            {
+              "title": "Check the handler locally before spending",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\npython3 -m unittest -v\n# Passing local tests do not prove live IAM permissions or DynamoDB atomicity."
+            },
+            {
+              "title": "Initialize, validate, and inspect the saved plan",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -var='table_environment_key=COUNTER_TABLE' -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Create only after reviewing the saved plan",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Trigger the intended runtime incident",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nFUNCTION=$(terraform output -raw function_name)\naws lambda wait function-active-v2 --function-name \"$FUNCTION\"\naws lambda invoke --function-name \"$FUNCTION\" --cli-binary-format raw-in-base64-out   --payload '{\"counter\":\"interview\"}' response.json\ncat response.json\n# Inspect FunctionError and the payload, not only Invoke's transport StatusCode.\ncat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\n# Follow investigation and acceptance. Repair through Terraform, then prove both valid and invalid input behavior."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review destruction of this workspace only",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nFUNCTION=$(terraform output -raw function_name)\nTABLE=$(terraform output -raw table_name)\nLOG_GROUP=$(terraform output -raw log_group)\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Apply the reviewed destroy plan and check state",
+              "command": "cd \"$LAB_ROOT/run/05-serverless-counter\"\nterraform apply destroy.tfplan\nterraform state list\n# Empty state alone does not prove all AWS resources are gone; complete the runbook absence checks.\naws dynamodb wait table-not-exists --table-name \"$TABLE\"\naws lambda get-function --function-name \"$FUNCTION\"\naws logs describe-log-groups --log-group-name-prefix \"$LOG_GROUP\" --query 'logGroups[].logGroupName'\n# Required: Lambda ResourceNotFoundException and no exact log-group match."
+            },
+            {
+              "title": "Verify named-resource absence and partial-apply recovery",
+              "command": "cat \"$LAB_ROOT/labs/05-serverless-counter/README.md\"\n# If a partial apply saved no outputs, recover exact names from Terraform state before destruction.\n# Use the Teardown section; retain state until named-resource absence is proved."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "06-state-rescue",
+      "alias": "06",
+      "title": "Rescue state without recreating infrastructure",
+      "kind": "terraform",
+      "runDirectory": "06-state-rescue",
+      "prerequisites": [],
+      "cost": "Negligible cost for one log group with no ingestion; do not send application logs.",
+      "modes": {
+        "starter": {
+          "label": "Write the adoption contract",
+          "description": "Provider guard and build contract; no moved-block answer is copied.",
+          "files": [
+            {
+              "source": "labs/06-state-rescue/starter/TASKS.md",
+              "destination": "TASKS.md"
+            },
+            {
+              "source": "labs/06-state-rescue/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/06-state-rescue/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm identity and understand the unmanaged fixture",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\ncat \"$LAB_ROOT/labs/06-state-rescue/README.md\""
+            },
+            {
+              "title": "Prepare the Terraform contract",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  cat TASKS.md\n  ${EDITOR:-vi} main.tf\n  terraform init -lockfile=readonly\n  terraform validate\n)"
+            },
+            {
+              "title": "Create the disposable fixture and save its ownership receipt",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  python3 \"$LAB_ROOT/labs/06-state-rescue/fixture.py\" create\n  # A failed create never changes retention or records ownership.\n  # Keep state-rescue-fixture.json for guarded import, drift and cleanup.\n  # If retention setup fails after creation, follow the runbook recovery steps.\n)"
+            },
+            {
+              "title": "Observe the create proposal without applying it",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  terraform plan\n  # After fixture creation, this create proposal is the import exercise.\n  # Import the owned fixture, prove a clean plan, then follow drift/refactor stages.\n  # Do not replace or delete the existing log group to make the plan pass.\n)"
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Choose cleanup based on whether import succeeded",
+              "command": "cat \"$LAB_ROOT/labs/06-state-rescue/README.md\"\n# Follow the guarded teardown block: verify the receipt and exact Terraform state,\n# then review and apply the Terraform destroy plan.\n# If import never succeeded, use the guarded import block first.\n# No receipt means stop; do not import or delete a same-name shared-account group."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference adoption configuration",
+          "description": "Copies the resource definition but leaves import, drift, and refactor for you.",
+          "files": [
+            {
+              "source": "labs/06-state-rescue/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/06-state-rescue/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/06-state-rescue/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm identity and understand the unmanaged fixture",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\ncat \"$LAB_ROOT/labs/06-state-rescue/README.md\""
+            },
+            {
+              "title": "Prepare the Terraform contract",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  terraform init -lockfile=readonly\n  terraform validate\n)"
+            },
+            {
+              "title": "Create the disposable fixture and save its ownership receipt",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  python3 \"$LAB_ROOT/labs/06-state-rescue/fixture.py\" create\n  # A failed create never changes retention or records ownership.\n  # Keep state-rescue-fixture.json for guarded import, drift and cleanup.\n  # If retention setup fails after creation, follow the runbook recovery steps.\n)"
+            },
+            {
+              "title": "Observe the create proposal without applying it",
+              "command": "(\n  set -euo pipefail\n  cd \"$LAB_ROOT/run/06-state-rescue\"\n  terraform plan\n  # After fixture creation, this create proposal is the import exercise.\n  # Import the owned fixture, prove a clean plan, then follow drift/refactor stages.\n  # Do not replace or delete the existing log group to make the plan pass.\n)"
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Choose cleanup based on whether import succeeded",
+              "command": "cat \"$LAB_ROOT/labs/06-state-rescue/README.md\"\n# Follow the guarded teardown block: verify the receipt and exact Terraform state,\n# then review and apply the Terraform destroy plan.\n# If import never succeeded, use the guarded import block first.\n# No receipt means stop; do not import or delete a same-name shared-account group."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "07-eks-foundation",
+      "alias": "07",
+      "title": "Build the short-lived EKS arena",
+      "kind": "terraform",
+      "runDirectory": "07-eks-foundation",
+      "prerequisites": [],
+      "cost": "Reserve $0.25/hour for the one-node us-west-2 arena, including provisioning and deletion; see current cost guide.",
+      "modes": {
+        "starter": {
+          "label": "Author the platform",
+          "description": "Provider guard and build requirements; implement the infrastructure yourself.",
+          "files": [
+            {
+              "source": "labs/07-eks-foundation/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/07-eks-foundation/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "labs/07-eks-foundation/README.md",
+              "destination": "BUILD.md"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm identity and provide real access values",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\n: \"${TF_VAR_admin_principal_arn:?Export the permanent IAM role/user ARN for your active AWS identity, never an STS session ARN}\"\nexport LAB_KUBE_CONTEXT=\"${LAB_KUBE_CONTEXT:-arcade-lab}\"\nexport TF_VAR_allowed_cidr=\"$(curl -fsS https://checkip.amazonaws.com)/32\"\n# Confirm the returned public IPv4 /32 before planning. Keep this input for cleanup."
+            },
+            {
+              "title": "Read the platform contract and cost tradeoffs",
+              "command": "cat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\ncd \"$LAB_ROOT/run/07-eks-foundation\"\n${EDITOR:-vi} main.tf"
+            },
+            {
+              "title": "Review the account, CIDR, node count, and absence of NAT/LB",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Apply the reviewed cluster plan",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Configure only the dedicated context and prove readiness",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nexport CLUSTER_NAME=\"$(terraform output -raw cluster_name)\"\nexport AWS_REGION=\"$(terraform output -raw region)\"\naws eks update-kubeconfig --profile \"$AWS_PROFILE\" --name \"$CLUSTER_NAME\" --region \"$AWS_REGION\" --alias \"$LAB_KUBE_CONTEXT\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" wait --for=condition=Ready nodes --all --timeout=300s\nkubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -L role -o wide\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n kube-system get pods\ncat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\n# Complete all four add-on health checks and the clean-plan check before starting 08-12."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Finish workloads and dynamic disks before the cluster",
+              "command": "cat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\n# Complete cleanup for every attempted 08-12 mission first.\n# EBS volume deletion must finish while the CSI controller, node, and IAM still exist."
+            },
+            {
+              "title": "Capture cluster identity and review foundation teardown",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nexport CLUSTER_NAME=\"$(terraform output -raw cluster_name 2>/dev/null || printf '%s-arcade' \"${TF_VAR_lab_id:-tfeks}\")\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Destroy and verify the exact cluster is gone",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform apply destroy.tfplan\nterraform state list\naws eks describe-cluster --name \"$CLUSTER_NAME\" --region \"$TF_VAR_region\"\n# Required: empty state and ResourceNotFoundException, not AccessDenied/network failure."
+            }
+          ]
+        },
+        "guided": {
+          "label": "Reference foundation",
+          "description": "Copies the complete cluster architecture; real account, IAM principal, and current CIDR remain required.",
+          "files": [
+            {
+              "source": "labs/07-eks-foundation/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/07-eks-foundation/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/07-eks-foundation/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Confirm identity and provide real access values",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile name}\"\n: \"${TF_VAR_expected_account_id:?Export your intended 12-digit AWS account ID}\"\n: \"${TF_VAR_lab_id:?Keep one distinctive lab ID for this session and its cleanup}\"\nexport AWS_REGION=\"${TF_VAR_region:-us-west-2}\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\nexport TF_VAR_region=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\n# Stop if identity validation fails. Planning can read AWS; apply creates resources.\n\n: \"${TF_VAR_admin_principal_arn:?Export the permanent IAM role/user ARN for your active AWS identity, never an STS session ARN}\"\nexport LAB_KUBE_CONTEXT=\"${LAB_KUBE_CONTEXT:-arcade-lab}\"\nexport TF_VAR_allowed_cidr=\"$(curl -fsS https://checkip.amazonaws.com)/32\"\n# Confirm the returned public IPv4 /32 before planning. Keep this input for cleanup."
+            },
+            {
+              "title": "Read the platform contract and cost tradeoffs",
+              "command": "cat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\ncd \"$LAB_ROOT/run/07-eks-foundation\""
+            },
+            {
+              "title": "Review the account, CIDR, node count, and absence of NAT/LB",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan  -out=lab.tfplan\nterraform show lab.tfplan"
+            },
+            {
+              "title": "Apply the reviewed cluster plan",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform apply lab.tfplan"
+            },
+            {
+              "title": "Configure only the dedicated context and prove readiness",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nexport CLUSTER_NAME=\"$(terraform output -raw cluster_name)\"\nexport AWS_REGION=\"$(terraform output -raw region)\"\naws eks update-kubeconfig --profile \"$AWS_PROFILE\" --name \"$CLUSTER_NAME\" --region \"$AWS_REGION\" --alias \"$LAB_KUBE_CONTEXT\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" wait --for=condition=Ready nodes --all --timeout=300s\nkubectl --context \"$LAB_KUBE_CONTEXT\" get nodes -L role -o wide\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n kube-system get pods\ncat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\n# Complete all four add-on health checks and the clean-plan check before starting 08-12."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Finish workloads and dynamic disks before the cluster",
+              "command": "cat \"$LAB_ROOT/labs/07-eks-foundation/README.md\"\n# Complete cleanup for every attempted 08-12 mission first.\n# EBS volume deletion must finish while the CSI controller, node, and IAM still exist."
+            },
+            {
+              "title": "Capture cluster identity and review foundation teardown",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nexport CLUSTER_NAME=\"$(terraform output -raw cluster_name 2>/dev/null || printf '%s-arcade' \"${TF_VAR_lab_id:-tfeks}\")\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan"
+            },
+            {
+              "title": "Destroy and verify the exact cluster is gone",
+              "command": "cd \"$LAB_ROOT/run/07-eks-foundation\"\nterraform apply destroy.tfplan\nterraform state list\naws eks describe-cluster --name \"$CLUSTER_NAME\" --region \"$TF_VAR_region\"\n# Required: empty state and ResourceNotFoundException, not AccessDenied/network failure."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "08-kubernetes-release",
+      "alias": "08",
+      "title": "A deployment that will not become healthy",
+      "kind": "terraform",
+      "runDirectory": "08-kubernetes-release",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No additional billable AWS resource; existing Game 07 cluster/node charges continue.",
+      "modes": {
+        "starter": {
+          "label": "Broken release",
+          "description": "Terraform-owned workload with a broken health check and a diagnostic client.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/08-kubernetes-release/broken/workload.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Select the existing lab cluster",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the release contract",
+              "command": "cat \"$LAB_ROOT/labs/08-kubernetes-release/README.md\""
+            },
+            {
+              "title": "Create the broken release through Terraform",
+              "command": "cd \"$LAB_ROOT/run/08-kubernetes-release\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Repair the candidate source, then prove traffic",
+              "command": "cd \"$LAB_ROOT/run/08-kubernetes-release\"\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan\n# Follow the runbook: real Service HTTP and allowed/denied observer checks.\ncat \"$LAB_ROOT/labs/08-kubernetes-release/README.md\""
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/08-kubernetes-release\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-app --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "09-pod-identity",
+      "alias": "09",
+      "title": "Credentials without static keys",
+      "kind": "terraform",
+      "runDirectory": "09-pod-identity",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "Tiny S3 fixture/request charges plus the running Game 07 cluster/node.",
+      "modes": {
+        "starter": {
+          "label": "Build infrastructure, debug workload",
+          "description": "Copies the provider guard, build requirements, and broken manifest; author main.tf.",
+          "files": [
+            {
+              "source": "labs/09-pod-identity/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/09-pod-identity/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "labs/09-pod-identity/README.md",
+              "destination": "BUILD.md"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/09-pod-identity/broken/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Build and review this lab’s AWS resources",
+              "command": "cat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\ncd \"$LAB_ROOT/run/09-pod-identity\"\n${EDITOR:-vi} main.tf\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
+            },
+            {
+              "title": "Write fixture configuration from the actual AWS output",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity\"\nexport FIXTURE_BUCKET=\"$(terraform output -raw bucket_name)\"\njq -n --arg bucket \"$FIXTURE_BUCKET\" --arg region \"$AWS_REGION\" '{apiVersion:\"v1\",kind:\"ConfigMap\",metadata:{name:\"fixture\",namespace:\"arcade-identity\"},data:{bucket:$bucket,region:$region}}' > workload/fixture.yaml\nprintf '%s\n' 'extra_manifest_paths = [\"fixture.yaml\"]' > workload/fixture.auto.tfvars\n# This file contains the bucket name and region, never credentials."
+            },
+            {
+              "title": "Create the broken Kubernetes workload through its own state",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Repair the source and collect acceptance evidence",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan\ncat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\n# Run the full acceptance sequence, including intended denials or disk persistence."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-identity --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            },
+            {
+              "title": "Remove the AWS identity and fixture after the workload",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\ncat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\n# Complete exact AWS absence checks before destroying Game 07."
+            }
+          ],
+          "terraformRoots": [
+            ".",
+            "workload"
+          ]
+        },
+        "guided": {
+          "label": "Reference infrastructure, broken workload",
+          "description": "Copies the reference AWS setup while preserving the faulty Kubernetes manifest.",
+          "files": [
+            {
+              "source": "labs/09-pod-identity/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/09-pod-identity/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/09-pod-identity/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/09-pod-identity/broken/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Build and review this lab’s AWS resources",
+              "command": "cat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\ncd \"$LAB_ROOT/run/09-pod-identity\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
+            },
+            {
+              "title": "Write fixture configuration from the actual AWS output",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity\"\nexport FIXTURE_BUCKET=\"$(terraform output -raw bucket_name)\"\njq -n --arg bucket \"$FIXTURE_BUCKET\" --arg region \"$AWS_REGION\" '{apiVersion:\"v1\",kind:\"ConfigMap\",metadata:{name:\"fixture\",namespace:\"arcade-identity\"},data:{bucket:$bucket,region:$region}}' > workload/fixture.yaml\nprintf '%s\n' 'extra_manifest_paths = [\"fixture.yaml\"]' > workload/fixture.auto.tfvars\n# This file contains the bucket name and region, never credentials."
+            },
+            {
+              "title": "Create the broken Kubernetes workload through its own state",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Repair the source and collect acceptance evidence",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan\ncat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\n# Run the full acceptance sequence, including intended denials or disk persistence."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity/workload\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-identity --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            },
+            {
+              "title": "Remove the AWS identity and fixture after the workload",
+              "command": "cd \"$LAB_ROOT/run/09-pod-identity\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\ncat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\n# Complete exact AWS absence checks before destroying Game 07."
+            }
+          ],
+          "terraformRoots": [
+            ".",
+            "workload"
+          ]
+        }
+      }
+    },
+    {
+      "id": "10-ebs-storage",
+      "alias": "10",
+      "title": "The disk that never appears",
+      "kind": "terraform",
+      "runDirectory": "10-ebs-storage",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "One 1 GiB gp3 volume prorated from about $0.08/month, plus the running Game 07 cluster/node.",
+      "modes": {
+        "starter": {
+          "label": "Build infrastructure, debug workload",
+          "description": "Copies the provider guard, build requirements, and broken manifest; author main.tf.",
+          "files": [
+            {
+              "source": "labs/10-ebs-storage/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/10-ebs-storage/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "labs/10-ebs-storage/README.md",
+              "destination": "BUILD.md"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/10-ebs-storage/broken/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Build and review this lab’s AWS resources",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\ncd \"$LAB_ROOT/run/10-ebs-storage\"\n${EDITOR:-vi} main.tf\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
+            },
+            {
+              "title": "Wait for the disk controller before creating the claim",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\n# Complete the controller readiness checks under Install the controller."
+            },
+            {
+              "title": "Create the broken Kubernetes workload through its own state",
+              "command": "cd \"$LAB_ROOT/run/10-ebs-storage/workload\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Repair the source and collect acceptance evidence",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\n# Investigate first. A corrected StorageClass can leave old annotations on an unbound claim.\n# Follow the controlled Terraform replacement procedure; never replace a bound disk blindly."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Remove the workload and verify the backing disk first",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\nbash \"$LAB_ROOT/labs/10-ebs-storage/cleanup.sh\"\n# The script reviews/destroys the Terraform workload, verifies the recorded disk\n# is absent, then reviews/destroys the add-on root. Finish Game 07 last."
+            }
+          ],
+          "terraformRoots": [
+            ".",
+            "workload"
+          ]
+        },
+        "guided": {
+          "label": "Reference infrastructure, broken workload",
+          "description": "Copies the reference AWS setup while preserving the faulty Kubernetes manifest.",
+          "files": [
+            {
+              "source": "labs/10-ebs-storage/solution/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "labs/10-ebs-storage/solution/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "labs/10-ebs-storage/solution/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/10-ebs-storage/broken/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Build and review this lab’s AWS resources",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\ncd \"$LAB_ROOT/run/10-ebs-storage\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
+            },
+            {
+              "title": "Wait for the disk controller before creating the claim",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\n# Complete the controller readiness checks under Install the controller."
+            },
+            {
+              "title": "Create the broken Kubernetes workload through its own state",
+              "command": "cd \"$LAB_ROOT/run/10-ebs-storage/workload\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Repair the source and collect acceptance evidence",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\n# Investigate first. A corrected StorageClass can leave old annotations on an unbound claim.\n# Follow the controlled Terraform replacement procedure; never replace a bound disk blindly."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Remove the workload and verify the backing disk first",
+              "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\nbash \"$LAB_ROOT/labs/10-ebs-storage/cleanup.sh\"\n# The script reviews/destroys the Terraform workload, verifies the recorded disk\n# is absent, then reviews/destroys the add-on root. Finish Game 07 last."
+            }
+          ],
+          "terraformRoots": [
+            ".",
+            "workload"
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet",
+      "alias": "11",
+      "title": "The incident gauntlet",
+      "kind": "runbook",
+      "runDirectory": null,
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "Reuses Game 07; choose one incident at a time and clean its namespace.",
+      "modes": {}
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-01",
+      "alias": "11-01",
+      "title": "Incident 01",
+      "kind": "terraform",
+      "runDirectory": "scenario-01",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-01/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-01\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-01\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-01\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-01\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-01 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-01/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-01\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-01 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-02",
+      "alias": "11-02",
+      "title": "Incident 02",
+      "kind": "terraform",
+      "runDirectory": "scenario-02",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-02/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-02\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-02\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-02\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-02\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-02 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-02/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-02\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-02 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-03",
+      "alias": "11-03",
+      "title": "Incident 03",
+      "kind": "terraform",
+      "runDirectory": "scenario-03",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-03/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-03\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-03\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-03\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-03\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-03 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-03/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-03\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-03 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-04",
+      "alias": "11-04",
+      "title": "Incident 04",
+      "kind": "terraform",
+      "runDirectory": "scenario-04",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-04/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-04\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-04\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-04\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-04\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-04 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-04/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-04\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-04 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-05",
+      "alias": "11-05",
+      "title": "Incident 05",
+      "kind": "terraform",
+      "runDirectory": "scenario-05",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-05/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-05\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-05\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-05\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-05\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-05 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-05/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-05\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-05 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-06",
+      "alias": "11-06",
+      "title": "Incident 06",
+      "kind": "terraform",
+      "runDirectory": "scenario-06",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-06/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-06\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-06\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-06\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-06\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-06 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Rerun a failed inspection Job after a permissions-only fix",
+              "command": "cd \"$LAB_ROOT/run/scenario-06\"\n# Save the failed Job logs first. Only use this if the Role changed but the Job did not.\nterraform plan -replace='module.exercise.kubernetes_manifest.job[\"Job/inspect\"]' -out=rerun.tfplan\nterraform show rerun.tfplan\nterraform apply rerun.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-06/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-06\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-06 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-07",
+      "alias": "11-07",
+      "title": "Incident 07",
+      "kind": "terraform",
+      "runDirectory": "scenario-07",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-07/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-07\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-07\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-07\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-07\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-07 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-07/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-07\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-07 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-08",
+      "alias": "11-08",
+      "title": "Incident 08",
+      "kind": "terraform",
+      "runDirectory": "scenario-08",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 cluster/node clock continues.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-08/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-08\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-08\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-08\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-08\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-08 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-08/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-08\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-08 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-09",
+      "alias": "11-09",
+      "title": "Incident 09",
+      "kind": "terraform",
+      "runDirectory": "scenario-09",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 arena keeps billing while you practice.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-09/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-09\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-09\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Create the broken workload through Terraform",
+              "command": "cd \"$LAB_ROOT/run/scenario-09\"\nterraform init -lockfile=readonly\nterraform validate\nterraform plan -out=incident.tfplan\nterraform show incident.tfplan\n# Review before applying: only this exercise namespace and its objects.\nterraform apply incident.tfplan"
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-09\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-09 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-09/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-09\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-09 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "11-incident-gauntlet/scenario-10",
+      "alias": "11-10",
+      "title": "Incident 10",
+      "kind": "terraform",
+      "runDirectory": "scenario-10",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "No new AWS services; the existing Game 07 arena keeps billing while you practice.",
+      "modes": {
+        "starter": {
+          "label": "Broken incident",
+          "description": "Terraform wrapper, diagnostic client, and broken candidate.yaml; no repair is copied.",
+          "files": [
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": ".terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload-module/versions.tf"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-10/starter/broken.yaml",
+              "destination": "candidate.yaml"
+            },
+            {
+              "source": "labs/11-incident-gauntlet/scenario-10/baseline/healthy.yaml",
+              "destination": "baseline.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Bind the existing lab cluster and account",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
+            },
+            {
+              "title": "Read the incident setup",
+              "command": "export NS=arcade-incident-10\nexport SCENARIO_DIR=\"$LAB_ROOT/labs/11-incident-gauntlet/scenario-10\"\ncat \"$SCENARIO_DIR/README.md\""
+            },
+            {
+              "title": "Establish the healthy baseline before injecting the fault",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-10/README.md\"\n# Run its one-node preflight, healthy baseline, and v1 HTTP assertion.\n# Then replace candidate.yaml with the starter update in this SAME Terraform state.\n# Applying the broken update to an empty namespace is not this incident."
+            },
+            {
+              "title": "Observe, then repair the working source",
+              "command": "cd \"$LAB_ROOT/run/scenario-10\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" -n arcade-incident-10 get pods -o wide\n# Record the failing behavior before editing. Follow the runbook diagnosis.\n${EDITOR:-vi} candidate.yaml\nterraform plan -out=repair.tfplan\nterraform show repair.tfplan\nterraform apply repair.tfplan"
+            },
+            {
+              "title": "Run the complete acceptance checks",
+              "command": "cat \"$LAB_ROOT/labs/11-incident-gauntlet/scenario-10/README.md\"\n# Use its HTTP, permissions, or maintenance checks; apply success alone is not recovery."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Review and remove this Terraform workload",
+              "command": "cd \"$LAB_ROOT/run/scenario-10\"\nterraform plan -destroy -out=destroy.tfplan\nterraform show destroy.tfplan\nterraform apply destroy.tfplan\nterraform state list\nkubectl --context \"$LAB_KUBE_CONTEXT\" get namespace arcade-incident-10 --ignore-not-found\n# Expect empty state and empty namespace output with a successful API call.\n# Game 07 still bills; finish its teardown at session end."
+            }
+          ],
+          "terraformRoots": [
+            "."
+          ]
+        }
+      }
+    },
+    {
+      "id": "12-capstone",
+      "alias": "12",
+      "title": "Ninety-minute platform interview",
+      "kind": "runbook",
+      "runDirectory": null,
+      "prerequisites": [
+        "07-eks-foundation",
+        "08-kubernetes-release",
+        "09-pod-identity",
+        "10-ebs-storage",
+        "11-incident-gauntlet"
+      ],
+      "cost": "Uses the whole-curriculum $20 allowance; reuse 07 and follow ordered teardown after 08–11.",
+      "modes": {}
+    },
+    {
+      "id": "13-public-access",
+      "alias": "13",
+      "title": "Healthy pods, broken public path",
+      "kind": "terraform",
+      "runDirectory": "13-public-access",
+      "prerequisites": [
+        "07-eks-foundation"
+      ],
+      "cost": "Reuses the existing worker and public IPv4; reserve about $0.15 for another half hour. No load balancer, NAT gateway, or extra VM.",
+      "modes": {
+        "starter": {
+          "label": "Broken public path",
+          "description": "Two Terraform states: the internal workload and one laptop-only ingress rule. The rule starts broken.",
+          "files": [
+            {
+              "source": "labs/13-public-access/starter/main.tf",
+              "destination": "access/main.tf"
+            },
+            {
+              "source": "labs/13-public-access/starter/versions.tf",
+              "destination": "access/versions.tf"
+            },
+            {
+              "source": "labs/13-public-access/starter/.terraform.lock.hcl",
+              "destination": "access/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/13-public-access/starter/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Prepare the existing cluster identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error.\n: \"${TF_VAR_lab_id:?Use the SAME lab ID as Game 07}\"\nexport CLUSTER_NAME=\"$TF_VAR_cluster_name\"\nexport LAB13_RUN=\"$LAB_ROOT/run/13-public-access\""
+            },
+            {
+              "title": "Check the worker and bind your laptop’s current public address",
+              "command": "bash \"$LAB_ROOT/labs/13-public-access/preflight.sh\" > \"$LAB13_RUN/preflight.json\"\njq . \"$LAB13_RUN/preflight.json\"\njq '{expected_account_id: .account, region, lab_id, aws_profile, cluster_name, node_instance_id, allowed_cidr}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/access/terraform.tfvars.json\"\njq '{expected_account_id: .account, region, cluster_name, aws_profile}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/workload/terraform.tfvars.json\""
+            },
+            {
+              "title": "Follow the workload and access plans in order",
+              "command": "cat \"$LAB_ROOT/labs/13-public-access/README.md\"\n# Skip its initial copy section: arcade already copied the working files.\n# Start at Create the incident through Terraform; inspect both saved plans.\n# Starter expects an external curl timeout while internal HTTP succeeds.\n# Guided uses the repaired access rule, so the initial external request should succeed."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Close access first; prove the rule is gone and external traffic is blocked",
+              "command": "cat \"$LAB_ROOT/labs/13-public-access/README.md\"\n# Follow Close the public path, then remove the workload exactly.\n# Destroy access first; verify the exact rule is absent and a fresh curl fails\n# while internal HTTP still succeeds. Then destroy workload, then Game 07."
+            }
+          ],
+          "terraformRoots": [
+            "access",
+            "workload"
+          ]
+        },
+        "guided": {
+          "label": "Reference access rule",
+          "description": "Two Terraform states: the internal workload and one laptop-only ingress rule. Copies the fixed rule; use starter to diagnose the deliberate failure.",
+          "files": [
+            {
+              "source": "labs/13-public-access/solution/main.tf",
+              "destination": "access/main.tf"
+            },
+            {
+              "source": "labs/13-public-access/solution/versions.tf",
+              "destination": "access/versions.tf"
+            },
+            {
+              "source": "labs/13-public-access/solution/.terraform.lock.hcl",
+              "destination": "access/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/main.tf",
+              "destination": "workload/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/variables.tf",
+              "destination": "workload/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/versions.tf",
+              "destination": "workload/versions.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/root-template/.terraform.lock.hcl",
+              "destination": "workload/.terraform.lock.hcl"
+            },
+            {
+              "source": "modules/kubernetes-exercise/main.tf",
+              "destination": "workload/workload-module/main.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/variables.tf",
+              "destination": "workload/workload-module/variables.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/outputs.tf",
+              "destination": "workload/workload-module/outputs.tf"
+            },
+            {
+              "source": "modules/kubernetes-exercise/versions.tf",
+              "destination": "workload/workload-module/versions.tf"
+            },
+            {
+              "source": "labs/13-public-access/starter/workload.yaml",
+              "destination": "workload/candidate.yaml"
+            }
+          ],
+          "steps": [
+            {
+              "title": "Prepare the existing cluster identity",
+              "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error.\n: \"${TF_VAR_lab_id:?Use the SAME lab ID as Game 07}\"\nexport CLUSTER_NAME=\"$TF_VAR_cluster_name\"\nexport LAB13_RUN=\"$LAB_ROOT/run/13-public-access\""
+            },
+            {
+              "title": "Check the worker and bind your laptop’s current public address",
+              "command": "bash \"$LAB_ROOT/labs/13-public-access/preflight.sh\" > \"$LAB13_RUN/preflight.json\"\njq . \"$LAB13_RUN/preflight.json\"\njq '{expected_account_id: .account, region, lab_id, aws_profile, cluster_name, node_instance_id, allowed_cidr}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/access/terraform.tfvars.json\"\njq '{expected_account_id: .account, region, cluster_name, aws_profile}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/workload/terraform.tfvars.json\""
+            },
+            {
+              "title": "Follow the workload and access plans in order",
+              "command": "cat \"$LAB_ROOT/labs/13-public-access/README.md\"\n# Skip its initial copy section: arcade already copied the working files.\n# Start at Create the incident through Terraform; inspect both saved plans.\n# Starter expects an external curl timeout while internal HTTP succeeds.\n# Guided uses the repaired access rule, so the initial external request should succeed."
+            }
+          ],
+          "cleanup": [
+            {
+              "title": "Close access first; prove the rule is gone and external traffic is blocked",
+              "command": "cat \"$LAB_ROOT/labs/13-public-access/README.md\"\n# Follow Close the public path, then remove the workload exactly.\n# Destroy access first; verify the exact rule is absent and a fresh curl fails\n# while internal HTTP still succeeds. Then destroy workload, then Game 07."
+            }
+          ],
+          "terraformRoots": [
+            "access",
+            "workload"
+          ]
+        }
+      }
+    }
+  ]
+}

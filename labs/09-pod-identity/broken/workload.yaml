@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-identity
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reader
+  namespace: arcade-identity
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reader-old
+  namespace: arcade-identity
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: reader
+  namespace: arcade-identity
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app: arcade-reader
+    spec:
+      serviceAccountName: reader-old
+      restartPolicy: Never
+      nodeSelector:
+        role: lab
+      containers:
+        - name: reader
+          image: public.ecr.aws/aws-cli/aws-cli:2.37.9
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              echo "Identity:"
+              aws sts get-caller-identity
+              echo "Allowed object:"
+              aws s3api get-object --bucket "$BUCKET" --key allowed/message.txt /tmp/message.txt
+              cat /tmp/message.txt
+              echo "ListBucket must be denied:"
+              if aws s3api list-objects-v2 --bucket "$BUCKET" >/tmp/list.out 2>/tmp/list.err; then
+                echo "FAIL: unexpected list permission"; exit 1
+              fi
+              cat /tmp/list.err
+              grep -q AccessDenied /tmp/list.err
+              echo "PASS: object read succeeded and bucket listing denied"
+          env:
+            - name: BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: fixture
+                  key: bucket
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: fixture
+                  key: region
+            - name: AWS_EC2_METADATA_DISABLED
+              value: "true"
+            - name: AWS_PAGER
+              value: ""
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

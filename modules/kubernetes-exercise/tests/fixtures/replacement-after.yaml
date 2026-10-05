@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: arcade-contract}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: {name: arcade-gp3}
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: check, namespace: arcade-contract}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: check
+          image: alpine:3.24.2
+          command: ["true"]

@@ -1,0 +1,151 @@
+{
+  "checkedAt": "2026-10-04",
+  "components": [
+    {
+      "name": "Terraform",
+      "version": "1.16.5",
+      "scope": "CLI, original 11 solution roots, Game 13 access root and portable Kubernetes workload root",
+      "status": "locally-validated",
+      "source": "https://releases.hashicorp.com/terraform/1.16.5/"
+    },
+    {
+      "name": "AWS provider",
+      "version": "6.67.0",
+      "scope": "Terraform provider schema validation and dependency locks",
+      "status": "locally-validated",
+      "source": "https://registry.terraform.io/providers/hashicorp/aws/6.67.0"
+    },
+    {
+      "name": "Archive provider",
+      "version": "2.8.1",
+      "scope": "Terraform provider schema validation and dependency locks",
+      "status": "locally-validated",
+      "source": "https://registry.terraform.io/providers/hashicorp/archive/2.8.1"
+    },
+    {
+      "name": "Kubernetes provider",
+      "version": "3.3.0",
+      "scope": "Terraform workload module and portable root; signed provider install, offline schema validation and mocked curriculum plans; no Kubernetes apply",
+      "status": "locally-validated",
+      "source": "https://registry.terraform.io/providers/hashicorp/kubernetes/3.3.0"
+    },
+    {
+      "name": "AWS CLI",
+      "version": "2.37.9",
+      "scope": "Installed from a GPG-verified official installer; version and read-only STS identity checks passed; no infrastructure deployed",
+      "status": "locally-validated",
+      "source": "https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst"
+    },
+    {
+      "name": "Amazon EKS",
+      "version": "1.36",
+      "scope": "Latest AWS EKS standard-supported minor; no cluster deployed",
+      "status": "source-verified",
+      "source": "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html"
+    },
+    {
+      "name": "kubectl",
+      "version": "1.36.5",
+      "scope": "Latest matching client patch; client version command only",
+      "status": "locally-validated",
+      "source": "https://dl.k8s.io/release/stable-1.36.txt"
+    },
+    {
+      "name": "kubeconform",
+      "version": "0.8.0",
+      "scope": "117 resource documents in 30 lab YAML files against Kubernetes 1.36.0 schemas",
+      "status": "locally-validated",
+      "source": "https://github.com/yannh/kubeconform/releases/tag/v0.8.0"
+    },
+    {
+      "name": "Lambda Python",
+      "version": "python3.14",
+      "scope": "Latest generally available managed Python runtime; no invocation on Lambda",
+      "status": "source-verified",
+      "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html"
+    },
+    {
+      "name": "Python image",
+      "version": "3.14.8-alpine",
+      "scope": "Latest stable Python image; public registry manifest available",
+      "status": "source-verified",
+      "source": "https://github.com/docker-library/official-images/blob/master/library/python"
+    },
+    {
+      "name": "NGINX image",
+      "version": "1.30.5-alpine",
+      "scope": "Latest stable NGINX channel; public registry manifest available",
+      "status": "source-verified",
+      "source": "https://nginx.org/en/download.html"
+    },
+    {
+      "name": "Alpine helper image",
+      "version": "3.24.2",
+      "scope": "Latest stable Alpine; extracted shell, HTTP probe, and file fixture smoke checks",
+      "status": "locally-validated",
+      "source": "https://alpinelinux.org/releases/"
+    },
+    {
+      "name": "DOMPurify",
+      "version": "3.4.16",
+      "scope": "Vendored browser HTML sanitizer; used in local browser rendering and sanitizer checks",
+      "status": "locally-validated",
+      "source": "https://github.com/cure53/DOMPurify/releases/tag/3.4.16"
+    },
+    {
+      "name": "Marked",
+      "version": "18.0.14",
+      "scope": "Vendored Markdown parser; marked.parse API and code-block rendering checked across authored Markdown",
+      "status": "locally-validated",
+      "source": "https://github.com/markedjs/marked/releases/tag/v18.0.14"
+    },
+    {
+      "name": "jq",
+      "version": "1.8.2",
+      "scope": "Installed project-locally; official SHA-256 verified and local version command passed",
+      "status": "locally-validated",
+      "source": "https://github.com/jqlang/jq/releases/tag/jq-1.8.2"
+    }
+  ],
+  "eks": {
+    "version": "1.36",
+    "standardSupportUntil": "2027-08-02",
+    "source": "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html"
+  },
+  "images": [
+    {
+      "image": "public.ecr.aws/aws-cli/aws-cli:2.37.9",
+      "status": 200,
+      "digest": "sha256:92de75724b6a746951f0e8b915d86bbccd7cb55aff96cd0cb4f7017272160780"
+    },
+    {
+      "image": "public.ecr.aws/docker/library/python:3.14.8-alpine",
+      "status": 200,
+      "digest": "sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72"
+    },
+    {
+      "image": "public.ecr.aws/docker/library/nginx:1.30.5-alpine",
+      "status": 200,
+      "digest": "sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94"
+    },
+    {
+      "image": "public.ecr.aws/docker/library/python:arcade-does-not-exist-7f4c2a",
+      "status": 404
+    },
+    {
+      "image": "public.ecr.aws/docker/library/alpine:3.24.2",
+      "status": 200,
+      "digest": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+      "amd64Digest": "sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395"
+    }
+  ],
+  "notes": [
+    "Latest means the selected supported release channel checked on the recorded date. It is not an automatic update guarantee.",
+    "Upstream Kubernetes 1.37.1 is newer than the EKS target. kubectl matches the EKS 1.36 minor; AWS add-ons select the latest compatible build at plan time.",
+    "Terraform 1.17 prereleases and Lambda Python 3.15 preview are excluded. NGINX follows its stable channel, not mainline.",
+    "The stable Alpine 3.24.2 helper replaces the standalone BusyBox image. BusyBox labels 1.38.0 unstable; its latest explicitly stable standalone release is 1.36.1 from 2023.",
+    "Local validation does not mean deployed to AWS. Read-only AWS authentication and a Game 05 plan were checked. No provisioning, Kubernetes admission tests, managed Lambda runtime execution, or live EKS incident reproduction occurred.",
+    "Alpine utility smoke checks ran extracted image binaries as host processes, not inside a container or Kubernetes cluster.",
+    "Host Python 3.12.3 ran the three Lambda handler unit tests. The local web runtime remains Python >=3.10 and requires no Node runtime."
+  ]
+}

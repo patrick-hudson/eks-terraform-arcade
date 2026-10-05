@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-storage
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: arcade-gp3
+provisioner: ebs.csi.eks.amazonaws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+  tagSpecification_1: "Project=aws-interview-arcade"
+  tagSpecification_2: "Lab=10"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+  namespace: arcade-storage
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: arcade-gp3
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: writer
+  namespace: arcade-storage
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: arcade-writer
+  template:
+    metadata:
+      labels:
+        app: arcade-writer
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        role: lab
+      containers:
+        - name: writer
+          image: public.ecr.aws/docker/library/alpine:3.24.2
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              test -f /data/message || echo "survived-pod-replacement" > /data/message
+              while true; do cat /data/message; sleep 30; done
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: data

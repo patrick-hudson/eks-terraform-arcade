@@ -1,0 +1,87 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-incident-04
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+    arcade-lab: '11'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: arcade-incident-04
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: incident
+  template:
+    metadata:
+      labels:
+        app: incident
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: app
+        image: public.ecr.aws/docker/library/python:3.14.8-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - -u
+        - -m
+        - http.server
+        - '8080'
+        - --directory
+        - /tmp
+        ports:
+        - name: http
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 2
+          periodSeconds: 3
+          timeoutSeconds: 2
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: arcade-incident-04
+spec:
+  type: ClusterIP
+  selector:
+    app: incident
+  ports:
+  - port: 8080
+    targetPort: http

@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-app
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: web
+  namespace: arcade-app
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: arcade-app
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: arcade-web
+  template:
+    metadata:
+      labels:
+        app: arcade-web
+    spec:
+      serviceAccountName: web
+      nodeSelector:
+        role: lab
+      containers:
+        - name: web
+          image: public.ecr.aws/docker/library/nginx:1.30.5-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: arcade-app
+spec:
+  type: ClusterIP
+  selector:
+    app: arcade-web
+  ports:
+    - port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: observer
+  namespace: arcade-app
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: observer
+  namespace: arcade-app
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: observer
+  namespace: arcade-app
+subjects:
+  - kind: ServiceAccount
+    name: observer
+    namespace: arcade-app
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: observer

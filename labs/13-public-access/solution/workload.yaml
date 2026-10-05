@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-public
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: public-content
+  namespace: arcade-public
+data:
+  index.html: |
+    arcade-public-ok
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: public-demo
+  namespace: arcade-public
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: arcade-public
+  template:
+    metadata:
+      labels:
+        app: arcade-public
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        role: lab
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: http
+          image: public.ecr.aws/docker/library/python:3.14.8-alpine
+          command: [python, -B, -m, http.server, "8080", --bind, 0.0.0.0, --directory, /srv]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          volumeMounts:
+            - name: content
+              mountPath: /srv
+              readOnly: true
+      volumes:
+        - name: content
+          configMap:
+            name: public-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-demo
+  namespace: arcade-public
+spec:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  selector:
+    app: arcade-public
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080

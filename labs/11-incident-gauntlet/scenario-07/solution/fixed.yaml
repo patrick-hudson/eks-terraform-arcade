@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-incident-07
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+    arcade-lab: '11'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: arcade-incident-07
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: incident
+  template:
+    metadata:
+      labels:
+        app: incident
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: app
+        image: public.ecr.aws/docker/library/python:3.14.8-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - -u
+        - -c
+        - |
+          import time
+          print("starting bounded allocation", flush=True)
+          payload = bytearray(8 * 1024 * 1024)
+          print(f"allocated={len(payload)}", flush=True)
+          time.sleep(3600)
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - kill -0 1
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 2

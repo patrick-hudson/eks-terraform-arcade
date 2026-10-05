@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-incident-06
+  labels:
+    app.kubernetes.io/part-of: aws-interview-arcade
+    arcade-lab: '11'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-settings
+  namespace: arcade-incident-06
+data:
+  message: arcade ready
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: inspector
+  namespace: arcade-incident-06
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: config-reader
+  namespace: arcade-incident-06
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  resourceNames:
+  - app-settings
+  verbs:
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: config-reader
+  namespace: arcade-incident-06
+subjects:
+- kind: ServiceAccount
+  name: inspector
+  namespace: arcade-incident-06
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: config-reader
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inspect
+  namespace: arcade-incident-06
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app: incident
+    spec:
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: app
+        image: public.ecr.aws/docker/library/python:3.14.8-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - python
+        - -u
+        - -c
+        - |
+          import os, pathlib, ssl, urllib.request, urllib.error, json
+          sa = pathlib.Path("/var/run/secrets/kubernetes.io/serviceaccount")
+          namespace = (sa / "namespace").read_text().strip()
+          token = (sa / "token").read_text().strip()
+          host = os.environ["KUBERNETES_SERVICE_HOST"]
+          port = os.environ["KUBERNETES_SERVICE_PORT_HTTPS"]
+          url = f"https://{host}:{port}/api/v1/namespaces/{namespace}/configmaps/app-settings"
+          request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+          context = ssl.create_default_context(cafile=str(sa / "ca.crt"))
+          try:
+              with urllib.request.urlopen(request, context=context, timeout=10) as response:
+                  result = json.load(response)
+                  print(result["data"]["message"], flush=True)
+          except urllib.error.HTTPError as error:
+              print(f"HTTP {error.code}: {error.read().decode()}", flush=True)
+              raise SystemExit(1)
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      serviceAccountName: inspector
+      restartPolicy: Never

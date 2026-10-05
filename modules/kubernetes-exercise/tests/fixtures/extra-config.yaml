@@ -1,0 +1,5 @@
+# Game 09 uses this shape for non-secret bucket/region identifiers.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: fixture, namespace: arcade-contract}
+data: {bucket: example-lab-bucket, region: us-west-2}

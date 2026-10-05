@@ -1,0 +1,86 @@
+name: Local checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  AWS_EC2_METADATA_DISABLED: 'true'
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: '1.16.5'
+          terraform_wrapper: false
+      - name: Check the authored file manifest
+        run: sha256sum --check --quiet MANIFEST.sha256
+      - name: Run Python tests without AWS credentials
+        run: |
+          python3 -m unittest discover -s web/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s labs/05-serverless-counter/solution -p 'test_*.py' -v
+          python3 -m unittest discover -s labs/10-ebs-storage/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s labs/13-public-access/tests -p 'test_*.py' -v
+      - name: Run browser-logic tests
+        run: node --test web/tests/*.test.cjs
+      - name: Validate recipes and shell syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          from scripts.lab_manager import load_recipes
+
+          root = Path.cwd()
+          recipes = load_recipes(root)
+          for recipe in recipes:
+              for mode in recipe['modes'].values():
+                  for item in mode['files']:
+                      source = root / item['source']
+                      if source.is_symlink() or not source.is_file():
+                          raise SystemExit(f'Missing or unsafe recipe source: {source}')
+                  for step in mode['steps'] + mode['cleanup']:
+                      subprocess.run(['bash', '-n'], input=step['command'], text=True, check=True)
+          tracked = subprocess.check_output(['git', 'ls-files', '-z'], text=True).split('\0')
+          for path in tracked:
+              if path.endswith('.sh') or path == 'scripts/arcade':
+                  subprocess.run(['bash', '-n', path], check=True)
+          print(f'Validated {len(recipes)} recipes and tracked shell scripts.')
+          PY
+      - name: Check Terraform formatting and local contracts
+        run: |
+          terraform fmt -check -recursive labs
+          terraform fmt -check -recursive modules
+          terraform -chdir=labs/00-terraform-contracts/solution init -backend=false -input=false
+          terraform -chdir=labs/00-terraform-contracts/solution test
+      - name: Validate and test mocked Kubernetes plans
+        run: |
+          terraform -chdir=modules/kubernetes-exercise init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=modules/kubernetes-exercise validate
+          terraform -chdir=modules/kubernetes-exercise test -json -verbose > "$RUNNER_TEMP/workload-tests.jsonl"
+          python3 modules/kubernetes-exercise/tests/assert-replacements.py "$RUNNER_TEMP/workload-tests.jsonl"

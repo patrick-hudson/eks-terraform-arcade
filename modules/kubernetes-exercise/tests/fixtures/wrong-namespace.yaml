@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arcade-contract
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unrelated
+  namespace: production
+data: {key: value}

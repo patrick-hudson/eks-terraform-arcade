@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ARCADE_SCRIPT=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "${BASH_SOURCE[0]}")
+ARCADE_ROOT=$(cd -- "$(dirname -- "$ARCADE_SCRIPT")/.." && pwd -P)
+source "$ARCADE_ROOT/scripts/env.sh"
+ARCADE_COMMAND=${1:-help}
+if (($#)); then shift; fi
+case "$ARCADE_COMMAND" in
+  doctor) exec python3 "$ARCADE_ROOT/scripts/doctor.py" "$@" ;;
+  serve) exec python3 "$ARCADE_ROOT/web/server.py" "$@" ;;
+  setup) exec bash "$ARCADE_ROOT/scripts/bootstrap-tools.sh" "$@" ;;
+  verify) exec python3 "$ARCADE_ROOT/scripts/verify-lab.py" "$@" ;;
+  smoke) exec python3 "$ARCADE_ROOT/scripts/smoke-aws.py" "$@" ;;
+  labs|start|next|status) exec python3 "$ARCADE_ROOT/scripts/lab_manager.py" "$ARCADE_COMMAND" "$@" ;;
+  check) exec python3 "$ARCADE_ROOT/scripts/local-check.py" "$@" ;;
+  root) printf '%s\n' "$ARCADE_ROOT" ;;
+  env) printf 'source %q\n' "$ARCADE_ROOT/scripts/env.sh" ;;
+  help|-h|--help)
+    cat <<'HELP'
+AWS Interview Arcade — local tools; no AWS calls unless you run a cloud command.
+
+  arcade doctor       Check local prerequisites and versions (offline)
+  arcade serve        Start the web app at http://127.0.0.1:8765
+  arcade setup        Install pinned tools under this project's .tools
+  arcade env          Print the command to activate this project's lab variables
+  arcade root         Print the project directory
+  arcade labs         Browse launchable labs and preparation modes
+  arcade start ID     Prepare practice files locally (use --mode guided for guided code)
+  arcade next ID      Print commands for an existing practice workspace
+  arcade status       Inspect local sessions and state counts; never queries AWS
+  arcade check 00|05  Run local rehearsal checks; use --workspace PATH
+  arcade verify ...   Read-only AWS/EKS checks; use --help for required context
+  arcade smoke ...    Scoped AWS smoke test; use --help before preparing a run
+
+Activate a lab terminal from any directory:
+  source "$(arcade root)/scripts/env.sh"
+Then follow each mission's explicit cd command into its run directory.
+HELP
+    ;;
+  *) printf 'Unknown command: %s. Run arcade help.\n' "$ARCADE_COMMAND" >&2; exit 2 ;;
+esac
