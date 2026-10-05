@@ -7,7 +7,7 @@ You have an AWS account, possibly with existing resources, and must build a sepa
 Your build must have:
 
 - Two `/24` public subnets in separate supported availability zones, an internet gateway and explicit routes.
-- An EKS 1.36 control plane with standard support, private API connectivity for nodes, and public API access restricted to your current IPv4 `/32`.
+- An EKS 1.37 control plane with standard support, private API connectivity for nodes, and public API access restricted to your current IPv4 `/32`.
 - API access entries and an explicit permanent IAM administrator principal. Disable implicit cluster-creator admin.
 - One managed AL2023 `t3.medium` node, 20 GiB encrypted gp3 root disk, deletion on termination, required IMDSv2 and hop limit 1. Use standard T3 credits to avoid surplus-credit charges. Maximum group size is two; no autoscaler is installed.
 - Managed VPC CNI, kube-proxy, CoreDNS and Pod Identity agent add-ons. Bootstrap networking before the node; adopt it after the node joins.

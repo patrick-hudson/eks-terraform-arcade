@@ -25,50 +25,50 @@
     {
       "name": "Kubernetes provider",
       "version": "3.3.0",
-      "scope": "Terraform workload module and portable root; signed provider install, offline schema validation and mocked curriculum plans; no Kubernetes apply",
-      "status": "locally-validated",
+      "scope": "Version 3.3.0 applied the portable workload module on EKS 1.37: authored image-pull fault and image-only Terraform repair; other workloads retain mocked-plan coverage",
+      "status": "cloud-validated",
       "source": "https://registry.terraform.io/providers/hashicorp/kubernetes/3.3.0"
     },
     {
       "name": "AWS CLI",
       "version": "2.37.9",
-      "scope": "Installed from a GPG-verified official installer; version and read-only STS identity checks passed; no infrastructure deployed",
+      "scope": "Installed from a GPG-verified official installer; STS, real Lambda/DynamoDB smoke operations and targeted cleanup checks passed",
       "status": "locally-validated",
       "source": "https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst"
     },
     {
       "name": "Amazon EKS",
-      "version": "1.36",
-      "scope": "Latest AWS EKS standard-supported minor; no cluster deployed",
-      "status": "source-verified",
-      "source": "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html"
+      "version": "1.37",
+      "scope": "One short-lived 1.37 STANDARD cluster in us-west-2: one Ready t3.medium node, four ACTIVE managed add-ons and an observed Terraform-repaired image-pull incident",
+      "status": "cloud-validated",
+      "source": "https://aws.amazon.com/about-aws/whats-new/2026/10/amazon-eks-distro-kubernetes-version-1-37/"
     },
     {
       "name": "kubectl",
-      "version": "1.36.5",
-      "scope": "Latest matching client patch; client version command only",
-      "status": "locally-validated",
-      "source": "https://dl.k8s.io/release/stable-1.36.txt"
+      "version": "1.37.1",
+      "scope": "Official checksum verified; matching 1.37.1 client exercised context, authorization, node health, rollout and internal Service HTTP checks on EKS 1.37",
+      "status": "cloud-validated",
+      "source": "https://dl.k8s.io/release/stable-1.37.txt"
     },
     {
       "name": "kubeconform",
       "version": "0.8.0",
-      "scope": "117 resource documents in 30 lab YAML files against Kubernetes 1.36.0 schemas",
+      "scope": "117 resource documents in 30 YAML files passed strict Kubernetes 1.37.0 schema validation",
       "status": "locally-validated",
       "source": "https://github.com/yannh/kubeconform/releases/tag/v0.8.0"
     },
     {
       "name": "Lambda Python",
       "version": "python3.14",
-      "scope": "Latest generally available managed Python runtime; no invocation on Lambda",
-      "status": "source-verified",
+      "scope": "Managed Python 3.14 runtime exercised: intended configuration fault, Terraform repair, counters 1 and 2, invalid input and confirmed cleanup",
+      "status": "cloud-validated",
       "source": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html"
     },
     {
       "name": "Python image",
       "version": "3.14.8-alpine",
-      "scope": "Latest stable Python image; public registry manifest available",
-      "status": "source-verified",
+      "scope": "Python 3.14.8-alpine image pulled and served the repaired scenario-01 workload on EKS 1.37",
+      "status": "cloud-validated",
       "source": "https://github.com/docker-library/official-images/blob/master/library/python"
     },
     {
@@ -108,9 +108,9 @@
     }
   ],
   "eks": {
-    "version": "1.36",
-    "standardSupportUntil": "2027-08-02",
-    "source": "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html"
+    "version": "1.37",
+    "standardSupportUntil": "2027-12-01",
+    "source": "https://aws.amazon.com/about-aws/whats-new/2026/10/amazon-eks-distro-kubernetes-version-1-37/"
   },
   "images": [
     {
@@ -141,10 +141,10 @@
   ],
   "notes": [
     "Latest means the selected supported release channel checked on the recorded date. It is not an automatic update guarantee.",
-    "Upstream Kubernetes 1.37.1 is newer than the EKS target. kubectl matches the EKS 1.36 minor; AWS add-ons select the latest compatible build at plan time.",
+    "EKS 1.37 is confirmed in us-west-2 by describe-cluster-versions and AWS\u2019s October 2026 release announcement. kubectl 1.37.1 matches it. AWS add-ons select the latest compatible build at plan time.",
     "Terraform 1.17 prereleases and Lambda Python 3.15 preview are excluded. NGINX follows its stable channel, not mainline.",
     "The stable Alpine 3.24.2 helper replaces the standalone BusyBox image. BusyBox labels 1.38.0 unstable; its latest explicitly stable standalone release is 1.36.1 from 2023.",
-    "Local validation does not mean deployed to AWS. Read-only AWS authentication and a Game 05 plan were checked. No provisioning, Kubernetes admission tests, managed Lambda runtime execution, or live EKS incident reproduction occurred.",
+    "Local validation does not mean deployed to AWS. A bounded Game 05 Lambda/DynamoDB fault, Terraform repair and cleanup were observed in us-west-2. A separate EKS 1.37 foundation and scenario-01 image-pull repair also passed live checks. See docs/VALIDATION.md for the exact scope, deletion evidence and untested lessons.",
     "Alpine utility smoke checks ran extracted image binaries as host processes, not inside a container or Kubernetes cluster.",
     "Host Python 3.12.3 ran the three Lambda handler unit tests. The local web runtime remains Python >=3.10 and requires no Node runtime."
   ]

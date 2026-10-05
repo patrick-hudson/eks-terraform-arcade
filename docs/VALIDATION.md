@@ -1,6 +1,23 @@
 # What was verified — and what was not
 
-Prepared October 4, 2026. **No AWS resources were created by the kit validation work.** Local AWS sign-in was confirmed with a read-only STS identity call after prerequisite installation. A bounded Game 05 AWS-backed Terraform plan subsequently passed with 5 creates, 0 changes and 0 destroys. No cloud apply/destroy or EKS runtime exercise has yet run. These checks are not a claim of successful end-to-end cloud deployment.
+Updated October 5, 2026 UTC. The latest pass includes bounded Game 05 Lambda/DynamoDB and Game 07 EKS/scenario-01 tests in us-west-2. Their live observations are recorded below. Earlier local-only checks are historical records, not claims about these later tests.
+
+## Shared environment controls and cloud proof — October 5, 2026 UTC
+
+**162 CLI Python tests, 49 web Python tests and 10 JavaScript test files passed.** The final regression pass includes root-switch races, partial-infrastructure cleanup, refusal to switch accounts with active or unknown state, exact plan approval, project-wide lifecycle serialization, verifier time/output limits, safe AWS absence classification, theme persistence, and real PTY navigation. Real built-in Terraform plan semantics and Game 00 apply/destroy also passed.
+
+- Fresh ZIP extraction passed checksum verification, executable root entry from another directory, a path containing spaces, catalog/drill listing, Game 13 session inspection, and availability of the new UI assets. All 39 Bash blocks in the updated setup/session guides passed syntax checks.
+- The web Environment tab and TUI use the same session engine for prerequisites, separate Terraform roots, saved plans, exact approval, costs, repair receipts and cleanup order. The browser runner is opt-in with `./arcade serve --runner`; ordinary serving remains read-only.
+- A real browser Game 00 session completed prepare, plan, typed apply, repair checks and typed destroy. Reloading during a job retained its outcome. Terraform state ended empty. This uses `terraform_data` and creates no AWS resources.
+- Light, dark and system appearance were checked in the browser, including persistence after reload. `docs/images/cloud-session-dark.png` and `practice-dark.png` are actual captures. The updated TUI GIF is rendered from an actual terminal recording of mission search, root selection, evidence, inventory and cleanup guidance; it does not depict an AWS deployment.
+- Four bounded Game 05 runs were created and cleaned. The first exposed a real SDK cold-start timeout at 128 MiB/5 seconds. A diagnostic run measured SDK startup consuming most of that limit; the authored lesson now uses 256 MiB/15 seconds while preserving its intended missing-environment-variable fault. An empty DynamoDB read also exposed a CLI parser edge case, now covered by a regression test.
+- The final managed Lambda run observed the expected `TABLE_NAME` fault, applied its Terraform repair, returned counters 1 then 2, rejected invalid input without a write, and produced a no-change convergence plan. It finished cleanup at **2026-10-05T03:22:27Z**. Empty Terraform state and targeted AWS checks confirmed the function, table, role and log group absent. Inline policies, log streams and test items were recorded with their owning resources before deletion.
+- Private resource names, ARNs, diagnostic logs and deletion evidence stay in ignored `run/smoke-*/REPORT.md` and ledgers. No account credentials or private cloud reports are packaged. All four runs have confirmed cleanup; the small estimated usage is not a measured AWS bill.
+- EKS **1.37** is offered in us-west-2 with standard support according to the regional AWS API. Add-on and AL2023 AMI compatibility were checked. kubectl **1.37.1** matched its official checksum. Strict Kubernetes **1.37.0** schema checks passed for **117 resource documents in 30 YAML files**, with zero errors or skips. These metadata/schema checks alone do not prove deployment.
+- The cloud-session review found that an unused workload could block cleanup after its prerequisite partially failed. The repair permits a reviewed cleanup-only plan without requiring missing creation outputs; it still preserves unknown-state and account checks. A separate reviewer verified the fix with eight targeted tests, including real local Terraform. No live partial-failure injection is claimed. Account/region rebinding over active or unknown state is also rejected before inputs are changed.
+
+- A live EKS **1.37 STANDARD** foundation reached one Ready `t3.medium` worker and four healthy managed add-ons. The shared foundation verifier and a no-change Terraform plan passed. Scenario 01 produced the intended `ImagePullBackOff`; the CLI correctly failed rollout, pod and Service-endpoint checks. An image-only Terraform update then produced a healthy rollout and internal Service HTTP response, and both the shared repair receipt and CLI verifier passed (seven checks, no failures/errors). The repaired Terraform plan also reported no changes. This exercises the Session/Runtime backend used by both interfaces; browser and TUI adapter checks remain the separate local/PTY evidence above.
+- EKS cleanup finished at **2026-10-05T04:12:31Z**, including the final CLI check. All three managed states were empty. Exact AWS checks confirmed the cluster, worker/Auto Scaling group, disk, network objects, IAM roles/profile and both launch templates removed; the public IPv4 release was tied to the terminated instance/deleted interface. Only the three service-linked roles proven absent before this test were owned and deleted. Existing account dependencies were retained. The EKS estimate was **$0.1265** including a small allowance; the combined five-run estimate was **about $0.33**, allowing $0.05 for each serverless run. Actual billing was not queried. Full identifiers and deletion evidence stay in the private `run/cloud-proof-report.md`.
 
 ## Practice desk and terminal workspace — October 4, 2026
 
@@ -14,7 +31,7 @@ This local-only implementation pass created **no AWS resources**. It added seven
 - **Fresh ZIP smoke passed:** extraction with `unzip`, checksum verification, executable root entry from another directory, paths with spaces, help, all recipes and drill listing. All recipe command blocks and launcher shell scripts passed Bash syntax checks.
 - `docs/images/practice-desk.png` is an actual browser capture; `docs/images/tui.gif` is an actual PTY recording rendered with a terminal emulator. The recording browses missions, prerequisites, authored observations and help; it does not show an AWS deployment.
 
-## Current expansion checks
+## Earlier curriculum expansion checks — October 4, 2026
 
 The expanded course contains **14 labs and 10 incidents**, with 120 stages, 240 task checkpoints and 72 progressive hints. All Kubernetes setup, repairs and teardown use Terraform-owned configuration. Operational checks, including an intentional maintenance eviction, are labeled separately.
 
@@ -31,7 +48,7 @@ The expanded course contains **14 labs and 10 incidents**, with 120 stages, 240 
 - **UI regression verification:** seven mounted-handler tests cover delayed hints, attempt resets, restored hints and navigation. Five clipboard/timer tests cover repeated copying, independent buttons and late completion. In the browser, a deliberately delayed hint stayed hidden after a new attempt, a fresh hint still loaded, and two rapid copy clicks returned to the original label. Clipboard success was stubbed for this timing check. Test progress was restored afterward.
 - The README and CI workflow include portable setup commands, pinned tool/action versions, explicit validation limits and authored-file packaging. CI has no AWS credentials or deployment steps; its hosted result is recorded separately when run.
 
-## Prerequisite and live-verification preparation
+## Earlier prerequisite and live-verification preparation
 
 - Installed project-local Terraform 1.16.5, AWS CLI 2.37.9, kubectl 1.36.5, kubeconform 0.8.0, and jq 1.8.2. Four downloads matched official SHA-256 checksums; AWS CLI passed GPG verification against AWS's documented signing-key fingerprint. A second installation succeeded with cached verified artifacts.
 - Bash PATH startup changes were backed up. A fresh login Bash launched from `/tmp`, with its initial PATH restricted to `/usr/bin:/bin`, found all tools and passed `arcade doctor`. Existing-terminal activation was checked twice without duplicating PATH or replacing existing AWS profile/region overrides. Missing region defaults to us-west-2. This verifies command discovery, not infrastructure permissions.
@@ -44,7 +61,7 @@ The expanded course contains **14 labs and 10 incidents**, with 120 stages, 240 
 
 The first live read-only Game 05 plan used Terraform 1.16.5 and the installed AWS provider in us-west-2. Account guard, initialization, validation and the five-resource plan allowlist passed. This establishes authentication and plan generation; creation permissions, service runtime behavior and teardown still require apply-time testing. The personal plan and identifiers remain under excluded `run/`.
 
-## Checks performed
+## Original curriculum and toolchain checks
 
 - **Current Terraform 1.16.5:** downloaded from HashiCorp and checked against its published SHA256 list. The earlier curriculum pass used Terraform 1.14.9; the refreshed configuration was validated again with 1.16.5. See the [toolchain record](toolchain.md) for current release sources and support decisions.
 - **11 complete Terraform solution roots:** `terraform init -backend=false -input=false -upgrade` and `terraform validate` passed with Terraform 1.16.5 in isolated scratch copies. AWS provider **6.67.0** and archive provider **2.8.1** were verified as current. The ten provider lockfiles were refreshed and copied back only after successful validation; runbooks copy them into your working directories. These commands install/inspect providers and validate configuration; they do not apply AWS resources or verify your AWS permissions.
@@ -70,9 +87,9 @@ Concurrent edits to the **same mission** still use whole-record timestamps; this
 
 ## Not executed here
 
-AWS apply/destroy, EKS provisioning, IAM policy simulation, Lambda invocation, S3 state migration/lock contention, EKS access authentication, image pulls on nodes, pod faults/repairs, Pod Identity, EBS CSI provisioning, and cloud teardown remain **unverified against a live account/cluster**. AWS credentials, SCPs, permissions boundaries, quotas, regional capacity, timing, image changes and add-on versions can change the result. Each mission includes the commands and success criteria for you to verify those layers.
+Outside the Game 05 and Game 07/scenario-01 cloud proofs above, S3 state migration/lock contention, workload Pod Identity permissions, EBS CSI provisioning, the other pod incidents, public internet reachability and their cloud teardown remain **unverified against a live account/cluster**. AWS credentials, SCPs, permissions boundaries, quotas, regional capacity, timing, image changes and add-on versions can change the result. Each mission includes the commands and success criteria for you to verify those layers.
 
-The examples intentionally avoid creating a cloud environment just to validate the tutorial. Preserve the distinction in interviews too: syntax validation, a mocked or local test, a cloud plan, and an observed cloud deployment establish different facts.
+Cloud validation is bounded and separately recorded. Preserve the distinction in interviews too: syntax validation, a mocked or local test, a cloud plan, and an observed cloud deployment establish different facts.
 
 ## Repeat the local checks
 
@@ -106,7 +123,7 @@ terraform -chdir="$LAB_ROOT/labs/00-terraform-contracts/solution" test
 `check-local.sh` downloads missing provider plugins, formats in check-only mode, validates solution roots, and runs the handler tests. It does not run AWS commands or apply resources. If kubeconform is installed separately, this optional command checks schemas and may download schema files:
 
 ```bash
-kubeconform -strict -summary -kubernetes-version 1.36.0 "$LAB_ROOT/labs"
+kubeconform -strict -summary -kubernetes-version 1.37.0 "$LAB_ROOT/labs"
 ```
 
 The starter in game 00 is intentionally invalid and is excluded from solution validation. Other starter Terraform files are incomplete writing scaffolds. Reference solutions are the validation targets; faults that are supposed to survive schema validation are documented separately in the answer keys.

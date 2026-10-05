@@ -44,7 +44,7 @@ class FakeRunner:
         return tuple(args)
 
 
-CLUSTER = {"cluster": {"status": "ACTIVE", "version": "1.36", "endpoint": "https://example.eks.amazonaws.com", "certificateAuthority": {"data": "dGVzdA=="}, "upgradePolicy": {"supportType": "STANDARD"}, "resourcesVpcConfig": {"endpointPrivateAccess": True, "endpointPublicAccess": True, "publicAccessCidrs": ["203.0.113.1/32"]}}}
+CLUSTER = {"cluster": {"status": "ACTIVE", "version": "1.37", "endpoint": "https://example.eks.amazonaws.com", "certificateAuthority": {"data": "dGVzdA=="}, "upgradePolicy": {"supportType": "STANDARD"}, "resourcesVpcConfig": {"endpointPrivateAccess": True, "endpointPublicAccess": True, "publicAccessCidrs": ["203.0.113.1/32"]}}}
 DEPLOY = {"metadata": {"generation": 2}, "spec": {"replicas": 1, "template": {"spec": {"containers": [{"name": "app", "readinessProbe": {"httpGet": {"path": "/", "port": "http"}}, "resources": {"limits": {"memory": "64Mi"}}}]}}}, "status": {"observedGeneration": 2, "replicas": 1, "updatedReplicas": 1, "availableReplicas": 1, "readyReplicas": 1}}
 PODS = {"items": [{"metadata": {"name": "app-abc"}, "spec": {"nodeName": "node-a"}, "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}], "containerStatuses": [{"name": "app", "ready": True, "restartCount": 0, "state": {"running": {"startedAt": "2020-01-01T00:00:00Z"}}}]}}]}
 FIXTURES = {

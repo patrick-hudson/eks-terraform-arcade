@@ -91,7 +91,7 @@ Run from a network that can reach the EKS public API and keep its egress IP stab
 ```bash
 aws eks describe-cluster-versions --region "$AWS_REGION" \
   --query 'clusterVersions[].{Version:clusterVersion,Status:versionStatus,StandardUntil:endOfStandardSupportDate}'
-export TF_VAR_kubernetes_version=1.36
+export TF_VAR_kubernetes_version=1.37
 EKS_SUPPORT=$(aws eks describe-cluster-versions --region "$AWS_REGION" \
   --cluster-versions "$TF_VAR_kubernetes_version" \
   --query 'clusterVersions[0].versionStatus' --output text)
@@ -106,7 +106,7 @@ aws service-quotas get-service-quota --service-code ec2 \
   --query 'Quota.{Name:QuotaName,Value:Value}'
 ```
 
-The reference uses **EKS 1.36**, the latest EKS version listed on October 4, 2026, with standard support ending **August 2, 2027**. Upstream Kubernetes 1.37.1 is newer but is not the EKS target. The check above fails if the chosen version is absent or outside standard support. Before applying, recheck add-on/client compatibility whenever you choose a newer version. The cluster support policy is `STANDARD`; it is not an expiration timer. One t3.medium uses 2 vCPUs; two use 4. Other running instances also consume the quota. Capacity/organization restrictions can block launches even when quota is sufficient.
+The reference uses **EKS 1.37**, confirmed by the us-west-2 AWS API and the [October 2026 release announcement](https://aws.amazon.com/about-aws/whats-new/2026/10/amazon-eks-distro-kubernetes-version-1-37/), with standard support ending **December 1, 2027 (UTC)**. kubectl **1.37.1** matches this target. The check above fails if the chosen version is absent or outside standard support. Before applying, recheck add-on/client compatibility whenever you choose a newer version. The cluster support policy is `STANDARD`; it is not an expiration timer. One t3.medium uses 2 vCPUs; two use 4. Other running instances also consume the quota. Capacity/organization restrictions can block launches even when quota is sufficient.
 
 ## 5. Prepare prerequisites in order
 

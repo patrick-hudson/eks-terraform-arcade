@@ -28,11 +28,11 @@ In another terminal, from the checkout:
 ./arcade tui
 ```
 
-Browse missions and simulated drills, inspect prerequisites, prepare practice files and manage supported Terraform environments in a full-screen interface. Use arrows and Enter to navigate; the screen shows help, back and quit controls. Python's standard-library `curses` and an interactive terminal are required. See the [terminal guide](docs/tui.md) for controls and recovery.
+Browse missions and simulated drills, search titles or symptoms with **/**, inspect prerequisites and manage supported Terraform environments in a full-screen interface. Use arrows and Enter to navigate; **c** opens cleanup, **r** repair evidence and **i** retained resource IDs from a mission. Python's standard-library `curses` and an interactive terminal are required. See the [terminal guide](docs/tui.md) for controls and recovery.
 
 ![Actual terminal recording of the arcade TUI](docs/images/tui.gif)
 
-This is an actual terminal recording. Terminal lifecycle actions support Games **00, 01, 03, 04, 05, 07, 08 and incidents 11-01 through 11-10**. Games **02, 06, 09, 10, 12 and 13** hand off to their runbooks for environment operations; Game 11 is the incident directory. Paid operations need an explicitly selected account/profile/region, a reviewed saved plan and typed approval. The interface shows prerequisite setup order; preparing files alone does not establish live readiness.
+The browser runner, CLI and TUI share lifecycle controls for Games **00, 01, 03, 04, 05, 07, 08, 09, 10, 13 and incidents 11-01 through 11-10**. Games **02, 06 and 12** retain complete ordered runbooks for their state migration, import and multi-lab work; Game 11 is the incident directory. Paid operations need an explicitly selected account/profile/region, a reviewed saved plan and typed approval. The interface shows prerequisite setup order; preparing files alone does not establish live readiness.
 
 For a short command-line practice session:
 
@@ -67,6 +67,33 @@ Start with a local-only Terraform exercise:
 ```
 
 Game 00 starts broken, so its first check should fail. Edit `run/00-contracts/` and rerun the check. `./arcade start 05 --mode guided` prepares reference code for a walkthrough. Repeating `start` preserves registered edits and state; preparation never applies resources. Follow each printed working directory and prerequisite runbook before continuing. The [launcher guide](docs/lab-launcher.md) covers preparation modes.
+
+## Run a cloud practice session
+
+After installing the tools and authenticating a named AWS profile, enable the local browser runner:
+
+```bash
+./arcade serve --runner
+```
+
+Open a mission’s **Environment** tab. It shows prerequisites, estimated **1-hour and 2-hour costs**, the selected Terraform root, repair evidence and retained resource IDs. Choose a starting mode, prepare the workspace and save the account, profile and region. Use **Plan changes**, review the saved plan summary, then type the displayed approval phrase to apply it. The ordinary `./arcade serve` remains read-only; opening a mission or selecting a root runs no cloud command. **Appearance** offers System, Light and Dark themes.
+
+![Dark browser Environment tab with session controls and cost estimates](docs/images/cloud-session-dark.png)
+
+Use **Submit repair** after applying your Terraform repair. It records bounded observations separately from study completion; failed, incomplete or stale evidence is not a pass. Some missions still require manual functional checks. Finish with **Plan cleanup**, review and approve that separate deletion plan, then complete the named-resource absence checks. Keep state and the retained inventory until deletion is proved.
+
+The same operations are available through `./arcade tui` and `./arcade session`. For example, after preparing and repairing Game 00:
+
+```bash
+./arcade session plan 00
+./arcade session apply 00       # Review, then type APPLY LOCAL when prompted.
+./arcade session submit 00
+./arcade session plan_destroy 00
+./arcade session apply 00       # Review, then type DESTROY LOCAL when prompted.
+./arcade session submit 00      # Check the local cleanup result.
+```
+
+See the [launcher guide](docs/lab-launcher.md#shared-session-commands) for exact cloud configuration flags, root selection and saved-plan approval. Games 09 and 10 use infrastructure then workload roots; Game 13 uses workload then access. Cleanup reverses that order before removing the shared Game 07 foundation.
 
 ## Choose your game
 
@@ -130,7 +157,7 @@ For EKS, remove public access and workloads while the cluster is reachable; veri
 
 ## Evidence and further reading
 
-Simulated feedback, local Terraform observations and live cloud evidence are different. This release adds no AWS resources, and offline checks do not prove live IAM permissions, EKS behavior, managed Lambda execution, internet reachability or deletion. The [validation record](docs/VALIDATION.md) states what was executed and what still needs a real account; the [AWS smoke-test guide](docs/aws-testing.md) describes scoped live checks. Tool versions and support limits are in the [toolchain record](docs/toolchain.md).
+Simulated feedback, local Terraform observations and live cloud evidence are different. Offline checks do not prove live IAM permissions, EKS behavior, managed Lambda execution, internet reachability or deletion. The [validation record](docs/VALIDATION.md) records local and live checks separately, including their failures, cleanup evidence and remaining gaps; the [AWS smoke-test guide](docs/aws-testing.md) describes scoped live checks. Tool versions and support limits are in the [toolchain record](docs/toolchain.md).
 
 [Development and CI](docs/development.md) · [Interview scorecard](docs/interview-scorecard.md) · [Learning design](docs/learning-design.md) · [Third-party notices](web/THIRD_PARTY_NOTICES.md)
 
