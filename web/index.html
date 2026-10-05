@@ -7,9 +7,12 @@
     <meta name="description" content="A local workspace for Terraform, AWS and EKS interview practice. Build infrastructure, diagnose failures, and explain your decisions.">
     <title>AWS Interview Arcade</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/workspace.css">
     <link rel="stylesheet" href="/drills.css">
+    <link rel="stylesheet" href="/theme.css">
+    <link rel="stylesheet" href="/session.css">
     <script src="/vendor/marked.umd.js" defer></script>
     <script src="/vendor/purify.min.js" defer></script>
     <script src="/practice-core.js" defer></script>
@@ -21,6 +24,7 @@
     <script src="/verification.js" defer></script>
     <script src="/practice.js" defer></script>
     <script src="/drills.js" defer></script>
+    <script src="/session.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -34,6 +38,7 @@
         </button>
         <div class="breadcrumb" id="topbar-title">Lab directory</div>
         <div class="topbar-status"><span class="status-dot" aria-hidden="true"></span>Local workspace</div>
+        <label class="theme-picker"><span>Appearance</span><select data-theme-choice aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
       </header>
       <main id="main" tabindex="-1">
         <div class="loading-state" role="status"><span class="loading-mark" aria-hidden="true"></span><p>Opening your workspace…</p></div>

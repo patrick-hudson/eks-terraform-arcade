@@ -85,7 +85,7 @@
       if (path.startsWith('/lab/')) {
         const params = new URLSearchParams(query);
         const tab = params.get('tab') || 'workspace';
-        return { kind: 'lab', id: decodeURIComponent(path.slice(5)), tab: ['workspace','brief','files','hints','answers','notes'].includes(tab) ? tab : 'brief', file: params.get('file') || '' };
+        return { kind: 'lab', id: decodeURIComponent(path.slice(5)), tab: ['workspace','session','brief','files','hints','answers','notes'].includes(tab) ? tab : 'brief', file: params.get('file') || '' };
       }
     } catch { return { kind: 'missing' }; }
     return { kind: 'missing' };

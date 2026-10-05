@@ -57,11 +57,15 @@ class ReadRunner:
 
     def run(self, argv):
         runtime = self.runtime
-        if runtime.runner is not lab_runtime.command_runner:
-            return runtime.runner(argv, runtime.path, runtime._env(), capture=True)
         try:
-            result = subprocess.run(argv, cwd=runtime.path, env=runtime._env(), shell=False,
-                                    stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=35)
+            if runtime.runner is not lab_runtime.command_runner:
+                # Browser jobs provide a bounded read path distinct from long
+                # Terraform operations. Injected test runners keep the same API.
+                runner = getattr(runtime.runner, 'read', runtime.runner)
+                result = runner(argv, runtime.path, runtime._env(), capture=True)
+            else:
+                result = subprocess.run(argv, cwd=runtime.path, env=runtime._env(), shell=False,
+                                        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=35)
         except FileNotFoundError:
             return subprocess.CompletedProcess(argv, 127, '', 'ArcadeToolMissing')
         except subprocess.TimeoutExpired:

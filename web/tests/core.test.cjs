@@ -31,3 +31,7 @@ test('search and track filters use public metadata, never answers', () => {
   assert.equal(core.filterLabs(labs, 'secret', 'All').length,0);
   assert.equal(core.filterLabs(labs, '', 'Terraform').length,1);
 });
+
+test('environment session links retain their route after reload',()=>{
+  assert.equal(core.parseRoute(core.labRoute('00-terraform-contracts','session')).tab,'session');
+});
