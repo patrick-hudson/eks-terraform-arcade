@@ -427,7 +427,18 @@
       try { const versions=await fetch('/api/toolchain'); if(versions.ok)toolchain=await versions.json(); } catch { /* Guides remain available if the version manifest cannot load. */ }
       exercises=catalog.labs.flatMap(lab => [lab,...lab.scenarios]);
       window.addEventListener('hashchange',renderRoute);
-      window.addEventListener('storage', event=>{ if(event.key===KEY && event.newValue) {progress=C.mergeStored(progress,C.readProgress(event.newValue));notify('Progress changed in another tab. Reopen this mission to load its latest details.');renderSidebar();} });
+      window.addEventListener('storage', event=>{
+        if(event.key!==KEY||!event.newValue)return;
+        const previous=route.kind==='drill'?JSON.stringify(progress.drills.current[route.id]):null;
+        progress=C.mergeStored(progress,C.readProgress(event.newValue));
+        if(route.kind==='drill'&&previous!==JSON.stringify(progress.drills.current[route.id])) {
+          void renderRoute();
+          notify('Practice updated from another tab. The current attempt has been refreshed.');
+        } else {
+          notify('Progress changed in another tab. Reopen this mission to load its latest details.');
+          renderSidebar();
+        }
+      });
       await renderRoute();
     } catch {
       $('#main').innerHTML='<div class="error-state"><h1>The local server is unavailable.</h1><p>Run <code>python3 web/server.py</code> from the project folder, then reload this page.</p><button class="button primary" id="reload-app">Reload</button></div>';

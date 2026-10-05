@@ -48,24 +48,24 @@
     }
     async function reveal(evidenceId,restoring=false){
       if(busy.has(evidenceId)||outputs.has(evidenceId))return;
-      const token=generation;busy.add(evidenceId);render();
+      const token=generation,attemptId=attempt()?.attemptId;busy.add(evidenceId);render();
       try{
         const data=await request('/api/drill-evidence',{id,evidence:evidenceId});
-        if(!active()||token!==generation)return;
+        if(!active()||token!==generation||attempt()?.attemptId!==attemptId)return;
         outputs.set(evidenceId,data.output);
         if(!restoring)write(s=>D.reveal(s,id,evidenceId));
-      }catch(error){if(active()&&token===generation)notify(error.message);}
-      finally{if(active()&&token===generation){busy.delete(evidenceId);render();}}
+      }catch(error){if(active()&&token===generation&&attempt()?.attemptId===attemptId)notify(error.message);}
+      finally{if(active()&&token===generation&&attempt()?.attemptId===attemptId){busy.delete(evidenceId);render();}}
     }
     async function answer(optionId,restoring=false){
       if(answerBusy)return;
-      const token=generation;answerBusy=true;render();
+      const token=generation,attemptId=attempt()?.attemptId;answerBusy=true;render();
       try{
         const data=await request('/api/drill-answer',{id,answer:optionId});
-        if(!active()||token!==generation)return;
+        if(!active()||token!==generation||attempt()?.attemptId!==attemptId)return;
         feedback=data;if(!restoring)write(s=>D.respond(s,id,optionId,data.correct));
-      }catch(error){if(active()&&token===generation)notify(error.message);}
-      finally{if(active()&&token===generation){answerBusy=false;render();}}
+      }catch(error){if(active()&&token===generation&&attempt()?.attemptId===attemptId)notify(error.message);}
+      finally{if(active()&&token===generation&&attempt()?.attemptId===attemptId){answerBusy=false;render();}}
     }
     render();
     for(const observation of attempt().observations)void reveal(observation,true);

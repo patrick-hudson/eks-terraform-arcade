@@ -13,7 +13,7 @@ async function mounted(){
   const scope={window:{ArcadeDrillsCore:D,ArcadeCore:{labRoute:id=>'#/lab/'+id}},document:{activeElement:null},URLSearchParams,crypto:{randomUUID:()=>`attempt-${++sequence}`},fetch:async url=>{if(url.startsWith('/api/drill?'))return {ok:true,json:async()=>brief};const pending=deferred();requests.push({url,...pending});return pending.promise;}};
   vm.runInNewContext(source,scope);
   const cleanup=await scope.window.ArcadeDrills.mount(target,'case-a',{esc:value=>String(value).replaceAll('<','&lt;'),icon:()=>'',getState:()=>state,setState:value=>{state=value;},isCurrent:()=>current,notify:message=>messages.push(message)});
-  return {target,requests,messages,cleanup,getState:()=>state,navigate:()=>{current=false;},click:kind=>target.querySelector(`[data-${kind}]`).onclick()};
+  return {target,requests,messages,cleanup,getState:()=>state,externalAttempt:()=>{state=D.begin(state,'case-a',`external-${++sequence}`);},navigate:()=>{current=false;},click:kind=>target.querySelector(`[data-${kind}]`).onclick()};
 }
 const response=data=>({ok:true,json:async()=>data});
 
@@ -37,4 +37,12 @@ test('rendered observations escape markup and explicit finish creates one summar
   assert.ok(m.target.html.includes('&lt;img src=x>'));assert.ok(!m.target.html.includes('<img src=x>'));
   pending=m.click('option');m.requests[1].resolve(response(feedback));await pending;
   assert.equal(m.getState().history.length,0);m.click('finish');assert.equal(m.getState().history.length,1);assert.equal(m.target.querySelector('[data-finish]'),null);
+});
+
+for(const kind of ['evidence','option'])test(`cross-tab new attempt discards stale ${kind} response`,async()=>{
+  const m=await mounted();const pending=m.click(kind);m.externalAttempt();
+  m.requests[0].resolve(response(kind==='evidence'?{output:'STALE_CROSS_TAB'}:feedback));await pending;
+  assert.equal(m.getState().current['case-a'].observations.length,0);
+  assert.equal(m.getState().current['case-a'].selectedAnswer,null);
+  assert.ok(!m.target.html.includes(kind==='evidence'?'STALE_CROSS_TAB':'EXPLANATION'));
 });

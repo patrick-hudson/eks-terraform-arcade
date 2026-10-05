@@ -315,7 +315,8 @@ class RuntimeTests(unittest.TestCase):
 
     def test_real_local_game_zero_lifecycle(self):
         tf = ROOT/'.tools/bin/terraform'
-        if not tf.is_file(): self.skipTest('bundled Terraform unavailable')
+        if not tf.is_file(): tf = shutil.which('terraform')
+        if not tf: self.skipTest('Terraform is unavailable on PATH and in .tools/bin')
         run = runtime.Runtime(self.root,'00')
         run.terraform = str(tf)
         run.prepare('guided')

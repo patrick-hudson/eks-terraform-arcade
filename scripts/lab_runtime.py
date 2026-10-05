@@ -17,7 +17,6 @@ import re
 import shlex
 import signal
 import subprocess
-import sys
 import tempfile
 
 import lab_manager
