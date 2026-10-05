@@ -119,6 +119,18 @@ class RuntimeTests(unittest.TestCase):
             run.plan()
         self.assertFalse(any(c[0][0].endswith('terraform') for c in self.runner.calls))
 
+    def test_clients_cannot_change_a_foundation_and_dependent_concurrently(self):
+        foundation = runtime.Runtime(self.root, '07', runner=self.runner)
+        dependent = runtime.Runtime(self.root, '11-01', runner=self.runner)
+        foundation.prepare('guided')
+        dependent.prepare('starter')
+        with foundation._locked():
+            with self.assertRaisesRegex(ValueError, 'Another lifecycle'):
+                with dependent._locked():
+                    self.fail('Concurrent dependent operation acquired its lock')
+        with dependent._locked():
+            pass
+
     def test_saved_plan_apply_decline_and_exact_binary(self):
         run = self.make()
         receipt = run.plan()

@@ -174,12 +174,15 @@ class Runtime:
     @contextmanager
     def _locked(self):
         self._workspace()
-        lockpath = lab_manager.contained_path(self.workspace, '.arcade-runtime.lock')
+        # Serialize the dependency graph across CLI, TUI and browser processes.
+        # A per-workspace lock alone permits foundation deletion while another
+        # client is creating a dependent workload whose state is still empty.
+        lockpath = lab_manager.contained_path(self.root, 'run/.arcade-runtime.lock')
         with lockpath.open('a') as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
-                raise RuntimeError('Another lifecycle operation owns this workspace.') from exc
+                raise RuntimeError('Another lifecycle operation owns this project. Wait for it to finish.') from exc
             yield
 
     def describe(self):

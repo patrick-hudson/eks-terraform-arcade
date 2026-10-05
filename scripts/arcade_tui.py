@@ -250,7 +250,7 @@ class Desk:
             self.search_text[cache_key] = ' '.join((item['id'], item['title'], text)).casefold()
         return all(token in self.search_text[cache_key] for token in query)
 
-    def choices(self):
+    def choices(self, snapshot=None):
         if self.view == 'desk':
             items = self.recipes if self.section == 'missions' else self.drills
             matches = [item for item in items if self.matches(item)]
@@ -269,7 +269,7 @@ class Desk:
             return [(root + ('  / current' if root == details['root'] else ''), ('root', root))
                     for root in details['roots']]
         if self.view == 'mission':
-            description = self.session().describe()
+            description = snapshot if snapshot is not None else self.session().describe()
             choices = [('Read mission runbook', ('runbook', None))]
             for item in description['prerequisites']:
                 choices.append((f"Prerequisite {item['alias']}" + (f" / {item['root']}" if item.get('root') else '')
@@ -357,7 +357,9 @@ class Desk:
                 self.put(4 + offset, 2, line)
             self.put(rows - 3, 2, f'Lines {self.scroll + 1}–{min(len(wrapped), self.scroll + height)} / {len(wrapped)}  |  PgUp / PgDn scroll', self.muted)
         else:
-            choices = self.choices()
+            # One local snapshot keeps menu, status and evidence consistent for this frame.
+            data = self.session().describe() if self.view == 'mission' else None
+            choices = self.choices(data)
             self.index = min(self.index, max(0, len(choices) - 1))
             top = 7
             if self.view == 'desk':
@@ -367,7 +369,6 @@ class Desk:
                 self.put(5, 2, ('Search: ' + query + ('▏' if self.searching else '') if query or self.searching else
                                '/ Search by title or symptom, e.g. ImagePullBackOff'), self.purple if self.searching else self.muted)
             elif self.view == 'mission':
-                data = self.session().describe()
                 self.header(f"Game {self.selected['alias']}  /  {self.selected['title']}")
                 self.put(4, 2, ('Session controls' if data['supported'] else 'Ordered runbook') +
                          f" | {data['status']} | Root: {data['root']}", self.purple)
