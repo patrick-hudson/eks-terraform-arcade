@@ -6,7 +6,7 @@ const C = require('../core.js');
 test('v1 notes and completion survive migration to guided practice', () => {
   const old = {schemaVersion:1,labs:{a:{status:'done',notes:'real evidence',checks:{reproduce:true,diagnose:true,verify:true,cleanup:true}}},lastLab:'a'};
   const result = C.readProgress(JSON.stringify(old));
-  assert.equal(result.schemaVersion,2);
+  assert.equal(result.schemaVersion,3);
   assert.equal(result.labs.a.notes,'real evidence');
   assert.equal(result.labs.a.status,'done');
   assert.deepEqual(result.labs.a.practice.completed,[]);

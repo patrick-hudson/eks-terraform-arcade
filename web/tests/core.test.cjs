@@ -17,7 +17,7 @@ test('relative Markdown paths resolve across labs, without escaping the kit', ()
 
 test('corrupt progress is recoverable and completion requires all checkpoints', () => {
   assert.deepEqual(core.readProgress('{broken').labs, {});
-  assert.equal(core.readProgress('{"schemaVersion":1,"labs":[]}').schemaVersion, 2);
+  assert.equal(core.readProgress('{"schemaVersion":1,"labs":[]}').schemaVersion, 3);
   const value = core.readProgress(JSON.stringify({ schemaVersion: 1, labs: { a: {status:'done', checks:{cleanup:false}, notes:'my notes'}, b:{status:'done', checks:{reproduce:true,diagnose:true,verify:true,cleanup:true}} } }));
   assert.equal(value.labs.a.status, 'active');
   assert.equal(value.labs.a.notes, 'my notes');

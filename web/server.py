@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
+import sys
 from urllib.parse import parse_qs, urlsplit
 
 if __package__:
@@ -18,7 +19,14 @@ else:
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from scripts import drill_engine
+
 ASSETS = {
+    "/drills.js": ("drills.js", "text/javascript; charset=utf-8"),
+    "/drills-core.js": ("drills-core.js", "text/javascript; charset=utf-8"),
+    "/drills.css": ("drills.css", "text/css; charset=utf-8"),
     "/launcher-core.js": ("launcher-core.js", "text/javascript; charset=utf-8"),
     "/launcher.js": ("launcher.js", "text/javascript; charset=utf-8"),
     "/verification-core.js": ("verification-core.js", "text/javascript; charset=utf-8"),
@@ -127,6 +135,19 @@ class ArcadeHandler(BaseHTTPRequestHandler):
             elif request.path == "/api/lesson":
                 query = self._query(request.query, {"id"})
                 self._send(200, json.dumps(self.server.learning.public_lesson(query["id"]), ensure_ascii=False))
+            elif request.path == "/api/drills":
+                if request.query:
+                    raise ValueError("Drill catalog takes no query parameters")
+                self._send(200, json.dumps(drill_engine.list_drills(root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill":
+                query = self._query(request.query, {"id"})
+                self._send(200, json.dumps(drill_engine.public_drill(query["id"], root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill-evidence":
+                query = self._query(request.query, {"id", "evidence"})
+                self._send(200, json.dumps(drill_engine.evidence(query["id"], query["evidence"], root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill-answer":
+                query = self._query(request.query, {"id", "answer"})
+                self._send(200, json.dumps(drill_engine.answer(query["id"], query["answer"], root=self.server.root), ensure_ascii=False))
             elif request.path == "/api/launch":
                 query = self._query(request.query, {"id"})
                 self._send(200, json.dumps(public_recipe(self.server.root, query["id"]), ensure_ascii=False))
