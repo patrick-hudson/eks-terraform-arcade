@@ -2,7 +2,7 @@
 
 The app is plain HTML, CSS and JavaScript served by Python's standard library. There is no build step or package installation. Use Python 3.10+ for the app and Node 18+ for JavaScript tests. The bootstrap installs the pinned Terraform binary; Node is a separate development dependency.
 
-From the project root, start the app with `python3 web/server.py`. Reload the page after editing existing source documents or frontend files. Restart the server after changing playbooks or adding inventory paths, then reload the page. The server reads its allowed source paths from `MANIFEST.sha256`, so add new deliverables to the packaging inventory and rebuild it before checking new missions in the browser.
+From the project root, start the app with `./arcade serve` and open `http://127.0.0.1:8765/#/practice`. Use `./arcade tui` for the terminal workspace; it requires an interactive terminal and standard-library curses. Reload the page after editing existing source documents or frontend files. Restart the server after changing playbooks or adding inventory paths, then reload the page. The server reads its allowed source paths from `MANIFEST.sha256`, so add new deliverables to the packaging inventory and rebuild it before checking new missions in the browser.
 
 ## Run the local checks
 
@@ -15,10 +15,13 @@ python3 -m unittest discover -s labs/05-serverless-counter/solution -p 'test_*.p
 python3 -m unittest discover -s labs/10-ebs-storage/tests -p 'test_*.py' -v
 python3 -m unittest discover -s labs/13-public-access/tests -p 'test_*.py' -v
 node --test web/tests/*.test.cjs
-python3 scripts/lab_manager.py labs --json
+./arcade labs --json
+./arcade drill list --json
+python3 scripts/tests/verify_plan_review_terraform.py
+bash -n arcade scripts/arcade
 ```
 
-The tests create temporary fixtures and use fake AWS/Kubernetes responses. HTTP server tests bind an available loopback port. The local rehearsal tests run a real Terraform binary when available and check both the broken and repaired Game 00 code. No test needs AWS credentials. A skipped Terraform test is a coverage gap; install the pinned binary to run it.
+The tests create temporary fixtures and use fake AWS/Kubernetes responses. HTTP server tests bind an available loopback port. The local rehearsal tests run a real Terraform binary when available and check both the broken and repaired Game 00 code. No test needs AWS credentials. A skipped Terraform test is a coverage gap; install the pinned binary to run it. The plan-reader verification fixture generates genuine plans with built-in `terraform_data` in a temporary directory and needs no cloud provider. Keep these observations separate from synthetic parser fixtures and authored simulations. Terminal lifecycle tests use fake runners for paid operations; the real Game 00 lifecycle remains local-only.
 
 To inspect the Terraform fixtures themselves:
 
@@ -50,6 +53,14 @@ Provider initialization downloads dependencies but does not provision infrastruc
 
 A private in-cluster response, a port-forward and a public internet response prove different traffic paths. State which one the exercise requires. A cleanup check must distinguish “deleted” from “could not inspect because access was denied.” Shared-account inventory is evidence to investigate, never a list to delete indiscriminately.
 
+## Change offline practice or terminal actions
+
+`practice/cases.json` and `practice/plan-drills.json` share the schema validated by `scripts/drill_engine.py`. CLI and browser adapters call the same public-brief, single-observation and answer operations. Add neutral symptoms and plausible alternatives without leaking the explanation into the brief. Displayed commands are evidence labels, never executable instructions. Keep browser drill history bounded and separate from mission completion; exercise migration, backup merging and stale-request handling when changing it.
+
+`./arcade review-plan PATH|- [--json]` reads learner Terraform show JSON only in the CLI. Preserve its value-free output boundary and secret-canary coverage. Do not add learner plans to fixtures, logs, browser APIs or release archives; use synthetic input and the local Terraform generator.
+
+`scripts/arcade_tui.py` provides terminal navigation; `scripts/lab_runtime.py` owns explicit supported operations. Preserve registered workspace checks, account/context binding, saved-plan receipts, typed approval and failure recovery. Do not execute recipe command strings. Test paid actions with fake runners and check actual PTY navigation separately. The [terminal guide](tui.md) is the authority for the support matrix and runbook handoffs.
+
 ## Package only authored files
 
 The packaging script combines the existing manifest with its explicit `ADDED_FILES` list. Add new public files there; do not use a broad recursive archive command.
@@ -60,7 +71,7 @@ sha256sum --check --quiet MANIFEST.sha256
 git status --short
 ```
 
-Review the inventory and archive before publishing. Keep `run/`, `work/`, `.tools/`, credentials, state, plans and personal variable files out of both Git and the ZIP. Include provider lockfiles and third-party notices. Screenshots belong in `docs/images/` and should show the teaching interface without account IDs or private terminal output.
+Review the inventory and archive before publishing. Keep `run/`, `work/`, `.tools/`, credentials, state, plans and personal variable files out of both Git and the ZIP. Include provider lockfiles and third-party notices. Screenshots belong in `docs/images/` and should show the actual teaching interface without account IDs or private terminal output. README uses `practice-desk.png` for the browser capture and `tui.gif` for an actual terminal recording; do not substitute a mockup. Verify root entry permissions and startup from a fresh ZIP extraction, including paths with spaces, before publishing.
 
 ## Continuous integration and its limits
 

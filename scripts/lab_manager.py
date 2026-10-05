@@ -214,11 +214,35 @@ def prepare(root: Path, recipe: dict, requested_mode: str | None) -> tuple[Path,
     return directory, mode, True
 
 
+def print_prerequisites(root: Path, recipe: dict, recipes: list[dict]) -> None:
+    """Show dependency order without preparing or checking any environment."""
+    ordered, seen = [], {recipe["id"]}
+
+    def visit(identifier: str) -> None:
+        if identifier in seen:
+            return
+        seen.add(identifier)
+        prerequisite = find_recipe(recipes, identifier)
+        for dependency in prerequisite["prerequisites"]:
+            visit(dependency)
+        ordered.append(prerequisite)
+
+    for identifier in recipe["prerequisites"]:
+        visit(identifier)
+    if not ordered:
+        print("\nPrerequisite Terraform environments: none declared.")
+        return
+    print("\nPrerequisite Terraform setup order (complete before this exercise):")
+    entry = shlex.quote(str(root / "arcade"))
+    for number, prerequisite in enumerate(ordered, 1):
+        print(f"{number}. {prerequisite['alias']} — {prerequisite['title']}")
+        print(f"   {entry} start {prerequisite['alias']}")
+    print("Prepared files are not verified live readiness. Follow each prerequisite runbook's verification before continuing.")
+
+
 def print_steps(root: Path, recipe: dict, mode: str, directory: Path) -> None:
     chosen = recipe["modes"][mode]
     print(f"\n{recipe['title']} — {chosen['label']}\n{chosen['description']}\nCost: {recipe['cost']}")
-    if recipe["prerequisites"]:
-        print("Prerequisites: " + ", ".join(recipe["prerequisites"]) + " (readiness has not been checked)")
     print("\nRun these commands yourself. Preparation executes no Terraform, kubectl or AWS commands.")
     print(f"\nsource {shlex.quote(str(root / 'scripts/env.sh'))}\ncd {shlex.quote(str(directory))}")
     for key, label in (("steps", "Next steps"), ("cleanup", "Cleanup after practice")):
@@ -356,6 +380,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
         else:
             recipe = find_recipe(recipes, args.id)
             if recipe["kind"] == "runbook":
+                print_prerequisites(root, recipe, recipes)
                 print(f"{recipe['title']} is a runbook; no standalone workspace is prepared.\nRead: {root / 'labs' / recipe['id'] / 'README.md'}")
                 return 0
             if args.command == "start":
@@ -366,6 +391,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
                 if not directory.exists():
                     raise LauncherError(f"Lab is not prepared. Run arcade start {recipe['alias']} first.")
                 mode = session_receipt(directory, recipe)["mode"]
+            print_prerequisites(root, recipe, recipes)
             print_steps(root, recipe, mode, directory)
         return 0
     except (OSError, ValueError) as error:

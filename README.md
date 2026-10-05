@@ -1,64 +1,72 @@
 # AWS Interview Arcade · Terraform + EKS
 
-Build small AWS systems. Diagnose deliberately broken ones. Explain your fix, prove it works, and tear everything down.
+Practice diagnosing failures, judging Terraform changes and explaining your decisions before spending money on AWS. Then build small systems, prove the repair works and tear them down.
 
-**24 missions for mid–senior DevOps, platform and SRE interviews:** 14 labs and 10 pod incidents, with a local web workspace, progressive hints, runnable examples and exact terminal commands. The questions use plain English and ask you to explain decisions you would make on the job.
+**31 exercises for mid–senior DevOps, platform and SRE interviews:** 24 existing hands-on missions (14 labs and 10 pod incidents) plus **7 simulated drills**. The drills use authored evidence; finishing one does not verify a live environment or complete a hands-on mission.
 
-![The local dashboard with 14 labs, 10 incidents, practice budget and learning paths](docs/images/workspace.jpg)
+## Try one exercise — no AWS setup
 
-## Start locally
-
-The web app needs **Python 3.10+** and no Python packages, Node installation or AWS credentials. The tool installer and `arcade start` support **Linux and WSL2**. For other platforms, use the web app and follow the [manual setup guide](docs/setup.md).
+You need **Python 3.10+**, Bash and Git. No AWS credentials, downloaded lab tools, pip packages or Node installation are needed for the Practice desk.
 
 ```bash
-mkdir -p "$HOME/work"
-git clone https://github.com/patrick-hudson/eks-terraform-arcade.git \
-  "$HOME/work/eks-terraform-examples"
-cd "$HOME/work/eks-terraform-examples"
-python3 web/server.py
+git clone https://github.com/patrick-hudson/eks-terraform-arcade.git
+cd eks-terraform-arcade
+./arcade serve
 ```
 
-Open **http://127.0.0.1:8765**. Keep this terminal running; use another for lab commands. If you already have this checkout, skip the clone.
+Open **[the Practice desk](http://127.0.0.1:8765/#/practice)**. Choose an investigation, reveal an observation, make a decision, then select **Finish attempt** to save its summary. The desk has four investigations and three Terraform plan-reading drills. Keep this terminal running while using the browser; Ctrl-C stops the local server.
 
-To install the lab tools, open that second terminal. The installer needs Bash, Python 3.10+, curl, unzip, tar, GPG and sha256sum already installed:
+![Actual browser capture of the purple Practice desk and its simulated exercises](docs/images/practice-desk.png)
+
+Already have a checkout or extracted ZIP? Open its directory and run `./arcade serve`. The root entry works before PATH activation. From elsewhere, use the entry's absolute path, such as `"/path with spaces/eks-terraform-arcade/arcade" help`.
+
+## Use the full terminal workspace
+
+In another terminal, from the checkout:
 
 ```bash
-cd "$HOME/work/eks-terraform-examples"
-bash scripts/bootstrap-tools.sh
+./arcade tui
+```
+
+Browse missions and simulated drills, inspect prerequisites, prepare practice files and manage supported Terraform environments in a full-screen interface. Use arrows and Enter to navigate; the screen shows help, back and quit controls. Python's standard-library `curses` and an interactive terminal are required. See the [terminal guide](docs/tui.md) for controls and recovery.
+
+![Actual terminal recording of the arcade TUI](docs/images/tui.gif)
+
+This is an actual terminal recording. Terminal lifecycle actions support Games **00, 01, 03, 04, 05, 07, 08 and incidents 11-01 through 11-10**. Games **02, 06, 09, 10, 12 and 13** hand off to their runbooks for environment operations; Game 11 is the incident directory. Paid operations need an explicitly selected account/profile/region, a reviewed saved plan and typed approval. The interface shows prerequisite setup order; preparing files alone does not establish live readiness.
+
+For a short command-line practice session:
+
+```bash
+./arcade drill list
+./arcade drill show ID
+./arcade drill evidence ID EVIDENCE_ID
+./arcade drill answer ID OPTION_ID
+```
+
+Use IDs printed by the preceding command. CLI drills are stateless; browser attempts are saved separately. `./arcade review-plan PATH` reads local Terraform show JSON and reports actions and uncertainty without displaying plan values or approving an apply. [The workspace guide](docs/web-ui.md) explains history and backups.
+
+## Optional: install tools for hands-on labs
+
+The installer and workspace preparation support **Linux and WSL2**. The installer needs Bash, Python 3.10+, curl, unzip, tar, GPG and sha256sum already installed. Other platforms can use the browser and the [manual setup guide](docs/setup.md).
+
+```bash
+./arcade setup
 source scripts/env.sh
-arcade doctor
+./arcade doctor
 ```
 
-Official downloads are verified and installed under the project's `.tools/` directory. The installer does not need sudo, edit shell startup files or sign you into AWS. Source the environment in each lab terminal to put `arcade`, `aws`, `terraform` and `kubectl` on PATH:
+Verified downloads go under this project's `.tools/`. Setup needs no sudo, does not edit shell startup files and does not sign you into AWS. Source `scripts/env.sh` in each lab terminal. Follow [account preflight](docs/setup.md) to choose a named profile, intended account and **us-west-2** before cloud work.
+
+Start with a local-only Terraform exercise:
 
 ```bash
-source "$HOME/work/eks-terraform-examples/scripts/env.sh"
-arcade serve
+./arcade start 00
+./arcade check 00
+./arcade next 00
+./arcade status
 ```
 
-`arcade serve` is an alternative to the Python command above; run one server. The default workload region is **us-west-2**. An existing region setting is preserved, so follow [setup](docs/setup.md) to select the account, profile and region explicitly before any cloud work.
-
-## Work through a mission
-
-The workspace follows **Brief → Build → Investigate → Verify → Cleanup**. Start with the symptom, write a hypothesis, and collect evidence before revealing another hint. Guided mode shows command checkpoints; Interview mode keeps them collapsed until you need them. A [plain-English glossary](docs/glossary.md) explains terms in context.
-
-Use the launcher to prepare a practice copy without creating cloud resources:
-
-```bash
-arcade labs
-arcade start 00
-arcade next 00
-arcade check 00
-arcade status
-```
-
-Game 00 starts broken, so its first local check should fail. Edit the files under `run/00-contracts/` and rerun `arcade check 00`. It runs eight trusted Terraform checks against a temporary copy. `arcade check 05` similarly tests your counter's Python handler locally; it cannot prove AWS permissions or the managed Lambda runtime work.
-
-![The launcher offers starter and guided preparation with copyable commands and the exact working directory](docs/images/launcher.jpg)
-
-`arcade start 05 --mode guided` prepares complete reference code for a walkthrough. `arcade start 11-01` prepares the first incident after you have built Game 07. The launcher prints each working directory, prerequisite and command; **it never runs Terraform apply**. Repeating `start` resumes a registered workspace without overwriting your edits or state. Games 11 and 12 are runbooks: the gauntlet points to individual incidents, and the capstone reuses Game 08's state.
-
-Save the symptom, decisive command output, repair and deletion proof in the evidence notebook. Export an interview debrief or back up progress before clearing browser data. Progress is stored in your browser, and the app does not execute shell commands or connect to AWS. See the [workspace guide](docs/web-ui.md) and [launcher guide](docs/lab-launcher.md).
+Game 00 starts broken, so its first check should fail. Edit `run/00-contracts/` and rerun the check. `./arcade start 05 --mode guided` prepares reference code for a walkthrough. Repeating `start` preserves registered edits and state; preparation never applies resources. Follow each printed working directory and prerequisite runbook before continuing. The [launcher guide](docs/lab-launcher.md) covers preparation modes.
 
 ## Choose your game
 
@@ -83,11 +91,11 @@ The gauntlet covers image pull failures, missing configuration, crashes, schedul
 
 Times are practice time boxes; provisioning and deletion take additional billable time. Stretch questions ask you to explain production choices unless they explicitly say to deploy something.
 
-## Every repair goes through Terraform
+## Repair, verify and clean up
 
-AWS repairs change the lab's `.tf` configuration or inputs. Kubernetes repairs change `candidate.yaml`, which the shared Terraform module reads and manages. Use `kubectl` to inspect pods, read logs and test traffic. The durable fix is a reviewed Terraform plan and apply, including for image and configuration problems. The [workload guide](docs/terraform-workloads.md) explains that flow.
+The browser follows **Brief → Build → Investigate → Verify → Cleanup**, with progressive hints and an evidence notebook. Save the symptom, decisive observation, Terraform repair, recovery proof and deletion evidence. Back up progress before clearing browser data. The [glossary](docs/glossary.md) explains terms in plain English.
 
-After following the mission's setup and moving into its **own run directory**:
+Every durable repair goes through Terraform. AWS repairs change `.tf` files or inputs. Kubernetes repairs change `candidate.yaml`, which the shared Terraform module manages; use `kubectl` for diagnosis. After following the mission's setup and moving into its **own run directory**, review the saved plan:
 
 ```bash
 terraform init
@@ -97,23 +105,19 @@ terraform show repair.tfplan
 terraform apply repair.tfplan
 ```
 
-Use the mission's exact flags and inputs, then run its behavioral checks. A clean plan and a healthy pod do not prove users can reach the app.
-
-Game 13 follows traffic from the application to its Service, node and AWS firewall rule. Its public test is a real `curl` from your laptop to the node's public address. Access is restricted to your current IPv4 address (`/32`); the lab reuses the existing worker and creates no load balancer or NAT gateway. After repairing the port in Terraform, prove the exact response arrives, then prove that public access closes after teardown.
-
-![The public-access mission guides diagnosis and proof of the actual internet traffic path](docs/images/public-access.jpg)
+Use the mission's exact flags and inputs, then run its behavioral checks. A clean plan or healthy pod does not prove users can reach the app. Game 13 requires an actual internet `curl` to the node's public address, restricted to your current IPv4 `/32`, followed by proof that access closes after teardown. It reuses the worker without a load balancer or NAT gateway. See [Terraform-managed workloads](docs/terraform-workloads.md).
 
 ## Keep the whole course within $20
 
-The planning allowance is **$20 total**, with an estimated spend below $5 for the suggested short sessions in **us-west-2**. This is an estimate, not an enforced spending limit. Prices, retries and forgotten resources affect the bill. The [cost guide](docs/cost-and-cleanup.md) includes rates, a session ledger, shared-account guidance and deletion checks.
+The planning allowance is **$20 total**, with an estimated spend below $5 for the suggested short sessions in **us-west-2**. This is an estimate, not an enforced cap. Prices, retries and forgotten resources affect the bill; use the [cost guide and session ledger](docs/cost-and-cleanup.md).
 
 1. Work through Games 00–06 first, tearing down each cloud fixture when finished.
-2. Build Game 07 once per EKS session and reuse it for the app, identity, storage and incident labs. Aim for about eight total cluster-hours across short sessions.
-3. Keep the default one worker. No NAT gateway or load balancer is required. Leave time for deletion before ending the session.
+2. Build Game 07 once per EKS session and reuse it for the workloads and incidents. Aim for about eight total cluster-hours across short sessions.
+3. Keep the default one worker, with no NAT gateway or load balancer. Reserve time for deletion.
 
-A shared AWS account is supported: Terraform works from the resources recorded in each lab's state, rather than adopting everything in the account. Use distinct lab names, confirm the intended account and inspect every plan. Never import, modify or delete unfamiliar resources to make an exercise pass.
+In a shared account, use distinct lab names, confirm the intended account and inspect every plan. Only manage resources owned by the lab's state. Never import, modify or delete unfamiliar resources to make an exercise pass.
 
-Follow each mission's cleanup order, then review a saved destroy plan from that same state directory:
+Follow the mission's cleanup order, then review a saved destroy plan from that same state directory:
 
 ```bash
 terraform plan -destroy -out=destroy.tfplan
@@ -122,27 +126,12 @@ terraform apply destroy.tfplan
 terraform state list
 ```
 
-For EKS, remove public access and workloads while the cluster is reachable. Verify storage disks are gone before deleting their driver, then remove identities/add-ons and the foundation. The full [cleanup sequence](docs/cost-and-cleanup.md) covers nested states and the remote backend exercise. Keep state and inputs until AWS deletion checks succeed. **Closing the web app, stopping its timer or deleting local files does not stop AWS charges.**
+For EKS, remove public access and workloads while the cluster is reachable; verify storage disks are gone before removing their driver, then remove identities/add-ons and the foundation. Follow the [complete cleanup sequence](docs/cost-and-cleanup.md) for nested states and the remote backend. Keep state and inputs until AWS deletion checks succeed. **Closing the app or terminal, stopping a timer or deleting local files does not stop AWS charges.**
 
-## What has actually been tested
+## Evidence and further reading
 
-Local checks cover the web app, progress storage, launch preparation, cleanup/preflight logic, the Lambda handler, Terraform contracts and mocked Kubernetes plans. The app can import read-only verification receipts for **Games 07/08 and incidents 01–08**. Other missions use their documented manual acceptance checks; importing a file does not certify the environment.
+Simulated feedback, local Terraform observations and live cloud evidence are different. This release adds no AWS resources, and offline checks do not prove live IAM permissions, EKS behavior, managed Lambda execution, internet reachability or deletion. The [validation record](docs/VALIDATION.md) states what was executed and what still needs a real account; the [AWS smoke-test guide](docs/aws-testing.md) describes scoped live checks. Tool versions and support limits are in the [toolchain record](docs/toolchain.md).
 
-A real AWS login and an isolated Game 05 plan were checked: **five creates, zero changes, zero destroys**. No cloud apply was performed as part of kit validation. Live EKS scheduling, Kubernetes admission, managed Lambda execution and the public HTTP path still need testing in your chosen account. See [validation evidence](docs/VALIDATION.md) and the [scoped AWS smoke-test guide](docs/aws-testing.md).
+[Development and CI](docs/development.md) · [Interview scorecard](docs/interview-scorecard.md) · [Learning design](docs/learning-design.md) · [Third-party notices](web/THIRD_PARTY_NOTICES.md)
 
-The release check on **October 4, 2026** selected **Terraform 1.16.5, EKS 1.36, kubectl 1.36.5 and AWS CLI 2.37.9**, with locked provider versions. [Toolchain sources and limits](docs/toolchain.md) distinguish installed versions from releases verified through official documentation. Recheck support before running the paid labs later.
-
-## Explore or contribute
-
-```text
-labs/                      missions, starter code, hints and reference repairs
-modules/kubernetes-exercise/ Terraform ownership for Kubernetes exercise files
-run/                       your practice copies, state and evidence; ignored by Git
-web/                       local Python server and browser app
-scripts/                   launcher, local checks and AWS verification tools
-docs/                      setup, glossary, cost, interview and development guides
-```
-
-[Development and CI commands](docs/development.md) · [Interview scorecard](docs/interview-scorecard.md) · [Learning design](docs/learning-design.md) · [Third-party notices](web/THIRD_PARTY_NOTICES.md)
-
-Keep state, plans, credentials and personal `.tfvars` files out of Git. Keep provider lockfiles. Developed with Compound Engineering planning, parallel implementation and review; the validation record is the authority for what was executed.
+Keep state, plans, credentials and personal `.tfvars` out of Git and shared progress backups. Keep provider lockfiles. Your practice files and state belong under `run/`; authored missions are under `labs/`, and simulated drills under `practice/`.

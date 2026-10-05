@@ -1,61 +1,57 @@
 # Setup and account preflight
 
-The preferred workload region is **us-west-2 (Oregon)**. Use a disposable sandbox account and a named AWS profile. The app runs locally and costs nothing; the commands you apply in AWS are billable.
+Start with the local Practice desk. It needs Python 3.10+ and no AWS credentials or downloaded lab tools. The preferred workload region for later hands-on work is **us-west-2 (Oregon)**. Use a disposable sandbox or the [shared-account ownership rules](cost-and-cleanup.md); commands you apply in AWS are billable.
 
-## 1. Activate this project
+## 1. Complete an offline exercise
 
-For this checkout, run this in each existing terminal you want to use for labs:
+From your checkout or extracted kit:
 
 ```bash
-source "$HOME/work/eks-terraform-examples/scripts/env.sh"
-mkdir -p "$LAB_ROOT/run"
+./arcade serve
 ```
 
-This sets `LAB_ROOT` to the script's actual project folder, adds `.tools/bin` to `PATH`, and supplies lab defaults. It preserves an existing `AWS_PROFILE` and region. If you previously selected another region, explicitly choose Oregon for this session:
+Open [the Practice desk](http://127.0.0.1:8765/#/practice), choose a simulated drill, reveal evidence and finish an attempt. The server and drills use Python's standard library; no pip packages or Node installation are required. If a port is busy, use `./arcade serve --port 8766` and open the corresponding URL. Ctrl-C stops the server, not AWS resources.
+
+For the full-screen terminal workspace, open another interactive terminal:
+
+```bash
+./arcade tui
+```
+
+This requires Python's standard-library curses module. Browsing and simulations need no AWS login. Environment actions require the tools and account preflight below. See [the terminal guide](tui.md) for platform limits, keyboard controls and recovery.
+
+The root `arcade` entry needs Bash and works before PATH activation. From another directory, invoke it by absolute path. For a Python-only browser entry, `python3 web/server.py` remains available.
+
+## 2. Install tools and activate a lab terminal
+
+The verified installer targets Linux and WSL2 and needs Bash, Python3, curl, unzip, tar, sha256sum and GPG already installed. From the checkout:
+
+```bash
+./arcade setup
+source scripts/env.sh
+./arcade doctor
+```
+
+Downloads go into this project's `.tools/`; the installer does not need sudo, edit shell startup files or sign you into AWS. On macOS, use the official vendor installers or Homebrew for Terraform, AWS CLI, matching kubectl and jq. Keep kubectl within one minor version of the EKS API server. The [toolchain record](toolchain.md) lists pinned versions and checked release sources.
+
+Source `scripts/env.sh` in each lab terminal, using its absolute path when elsewhere. `./arcade env` prints the quoted activation command. This sets `LAB_ROOT`, adds `.tools/bin` to PATH and supplies lab defaults. It preserves an existing AWS profile and region. It does not change your directory or choose an account. Follow each mission's explicit `cd` command into its own `run/` directory; keep reference solutions unchanged.
+
+Explicitly select Oregon before paid work:
 
 ```bash
 export AWS_REGION=us-west-2
 export AWS_DEFAULT_REGION="$AWS_REGION"
 export TF_VAR_region="$AWS_REGION"
-```
-
-On this machine, the installed Bash startup block makes the tools and `arcade` command available in new Bash terminals. An already-open terminal needs the `source` command above once. Source the environment again when a new terminal needs the lab variables. Run each mission’s explicit `cd` commands before its relative Terraform commands; putting binaries on PATH does not choose a state directory. It does not sign you in, change your current directory, or choose an AWS account.
-
-For an extracted copy elsewhere, source its `scripts/env.sh` by absolute path instead. `run/` holds your own state and evidence; keep reference solutions unchanged.
-
-## 2. Install or verify tools
-
-```bash
-arcade doctor
 aws --version
 terraform version
 kubectl version --client
 ```
 
-These checks run locally. Terraform **1.16.5**, AWS CLI **2.37.9**, kubectl **1.36.5**, jq **1.8.2**, and kubeconform **0.8.0** are installed under `.tools`. The existing Python **3.12.3** runs the app; it needs Python 3.10 or later and no pip packages. Node is only used for development tests. See the [toolchain record](toolchain.md) for checked release sources.
-
-To reproduce the Linux/WSL installation in a fresh copy:
-
-```bash
-cd "$HOME/work/eks-terraform-examples"
-bash scripts/bootstrap-tools.sh
-source scripts/env.sh
-arcade doctor
-```
-
-The bootstrap script checks official downloads before installing them. It requires Bash, Python3, curl, unzip, tar, sha256sum, and GPG. On macOS, use the official vendor installers or Homebrew for Terraform, AWS CLI, matching kubectl and jq; the supplied binary bootstrap targets Linux. Keep kubectl within one minor version of the EKS API server.
-
-To start the web app from any directory:
-
-```bash
-arcade serve
-```
-
-Open **http://127.0.0.1:8765**. If it is already open and serving this kit, reuse it. Ctrl-C stops the local app, not any AWS resources.
+Those version checks run locally. The environment change affects only this shell and its child processes.
 
 ## 3. Authenticate and pin the intended account
 
-You already use an IAM user or role and do not need to establish SSO just for this kit. Follow [the AWS testing guide](aws-testing.md) to grant the browser-login permission and scoped Game 05 operator permissions. Sign in yourself; never paste credentials in chat.
+Use an authenticated named profile appropriate for your account. For IAM user or role browser login, follow [the AWS testing guide](aws-testing.md) to grant the browser-login permission and scoped Game 05 operator permissions. Sign in yourself; never paste credentials in chat.
 
 Use fresh profile names if these already belong to another account:
 
@@ -112,7 +108,15 @@ aws service-quotas get-service-quota --service-code ec2 \
 
 The reference uses **EKS 1.36**, the latest EKS version listed on October 4, 2026, with standard support ending **August 2, 2027**. Upstream Kubernetes 1.37.1 is newer but is not the EKS target. The check above fails if the chosen version is absent or outside standard support. Before applying, recheck add-on/client compatibility whenever you choose a newer version. The cluster support policy is `STANDARD`; it is not an expiration timer. One t3.medium uses 2 vCPUs; two use 4. Other running instances also consume the quota. Capacity/organization restrictions can block launches even when quota is sufficient.
 
-## 5. Standard apply and cleanup loop
+## 5. Prepare prerequisites in order
+
+Before a live exercise, run `./arcade start ID` or `./arcade next ID` from the checkout, or open it in `./arcade tui`. The browser's mission view also lists prerequisite environments. Follow the numbered prerequisite setup commands before returning to the exercise. Prepared files, a session receipt or a local state count are not proof that the environment works in AWS.
+
+Game 07 supplies the cluster for Games 08–13 and the individual incidents. Keep its state and use the mission's own working directory for each dependent workload. For multi-root runbooks, follow their internal order: Game 09 creates its AWS resources before the workload; Game 10 creates AWS resources and proves the storage controller ready before the workload; Game 13 creates the workload before public access and removes access before the workload.
+
+The terminal manages Games 00, 01, 03, 04, 05, 07, 08 and incidents 11-01 through 11-10. Complex roots hand off to runbooks; see the [support matrix](tui.md). Game 05 guided mode deliberately retains its starting fault until you repair the Terraform input. Incident 11-10 needs a healthy v1 baseline and live readiness/HTTP proof before its separately reviewed broken update. Neither shortcutting prerequisite verification nor an empty namespace reproduces that update incident.
+
+## 6. Standard apply and cleanup loop
 
 Inside the lab's **run** directory:
 

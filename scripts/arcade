@@ -9,6 +9,9 @@ case "$ARCADE_COMMAND" in
   doctor) exec python3 "$ARCADE_ROOT/scripts/doctor.py" "$@" ;;
   serve) exec python3 "$ARCADE_ROOT/web/server.py" "$@" ;;
   setup) exec bash "$ARCADE_ROOT/scripts/bootstrap-tools.sh" "$@" ;;
+  drill) exec python3 "$ARCADE_ROOT/scripts/drill.py" "$@" ;;
+  review-plan) exec python3 "$ARCADE_ROOT/scripts/review-plan.py" "$@" ;;
+  tui) exec python3 "$ARCADE_ROOT/scripts/arcade_tui.py" "$@" ;;
   verify) exec python3 "$ARCADE_ROOT/scripts/verify-lab.py" "$@" ;;
   smoke) exec python3 "$ARCADE_ROOT/scripts/smoke-aws.py" "$@" ;;
   labs|start|next|status) exec python3 "$ARCADE_ROOT/scripts/lab_manager.py" "$ARCADE_COMMAND" "$@" ;;
@@ -19,6 +22,12 @@ case "$ARCADE_COMMAND" in
     cat <<'HELP'
 AWS Interview Arcade — local tools; no AWS calls unless you run a cloud command.
 
+From a fresh checkout, use ./arcade COMMAND. No PATH setup is needed.
+
+  arcade drill ...    Practice simulated investigations and plan decisions (offline)
+  arcade review-plan PATH|- [--json]
+                      Read local Terraform show JSON without displaying plan values
+  arcade tui          Open the full-screen terminal workspace (interactive terminal)
   arcade doctor       Check local prerequisites and versions (offline)
   arcade serve        Start the web app at http://127.0.0.1:8765
   arcade setup        Install pinned tools under this project's .tools
@@ -32,8 +41,10 @@ AWS Interview Arcade — local tools; no AWS calls unless you run a cloud comman
   arcade verify ...   Read-only AWS/EKS checks; use --help for required context
   arcade smoke ...    Scoped AWS smoke test; use --help before preparing a run
 
-Activate a lab terminal from any directory:
-  source "$(arcade root)/scripts/env.sh"
+First exercise: ./arcade serve, then open http://127.0.0.1:8765/#/practice
+Optional lab tools: ./arcade setup
+Activate a lab terminal from the checkout:
+  source scripts/env.sh
 Then follow each mission's explicit cd command into its run directory.
 HELP
     ;;

@@ -1,28 +1,38 @@
 # Web workspace
 
-The local workspace guides you through 24 missions: 14 games and ten individual incidents. Its five-stage workflow contains 120 stages, 240 task checkpoints, 72 progressive investigation hints and 24 interview reasoning checks. It reads the same runbooks and code files you can open in your editor.
+The local workspace contains 24 hands-on missions (14 games and ten individual incidents) and seven separate simulated drills. The hands-on five-stage workflow contains 120 stages, 240 task checkpoints, 72 progressive investigation hints and 24 interview reasoning checks. It reads the same runbooks and code files you can open in your editor.
 
 ## Start and stop
 
 Use Python 3.10 or newer on Linux, macOS or WSL2. From the project root:
 
 ```bash
-python3 web/server.py
+./arcade serve
 ```
 
-Open **http://127.0.0.1:8765** and keep that terminal running. No npm installation, AWS credentials or internet connection is needed to use the workspace. External documentation and actual lab commands have their usual internet requirements.
+Open **[the Practice desk](http://127.0.0.1:8765/#/practice)** and keep that terminal running. No npm installation, AWS credentials or internet connection is needed to use the workspace. External documentation and actual lab commands have their usual internet requirements.
 
 If the port is occupied:
 
 ```bash
-python3 web/server.py --port 8766
+./arcade serve --port 8766
 ```
 
 Then open http://127.0.0.1:8766. The server accepts only loopback connections. Press Ctrl-C in its terminal to stop it. **Stopping the server leaves any AWS resources you created running.** Finish the mission’s cleanup instructions separately.
 
+## Practice before provisioning
+
+The **Practice desk** has four authored investigations and three Terraform plan-reading drills. Their observation output is simulated, and displayed diagnostic commands never execute. Open a brief, reveal one observation at a time, choose a decision and read the explanation. The debrief connects decisive evidence to a Terraform repair, recovery proof, cleanup and a changed-constraint interview question.
+
+Select **Finish attempt** after choosing an answer to save a compact summary. Merely opening, refreshing or revisiting a drill does not record a completion. **New attempt** starts another repetition; completed attempts stay separate from the 24 hands-on mission records. The newest 20 summaries retain the drill, completion time, first-answer result, revealed observation IDs and practice duration. A drill result does not prove cloud health, cleanup, safety or mastery.
+
+The desk suggests an incorrectly answered drill first, then a never-attempted drill, then the least recently completed one. It shows its reason and lets you choose freely. Export and restore preserve the summaries and current attempt; repeated restore does not duplicate attempts with the same ID.
+
+For the same authored content in a terminal, use `./arcade drill list` or the [full-screen terminal workspace](tui.md). Learner Terraform plans stay outside the browser: [the local plan coach](plan-review.md) accepts Terraform show JSON through `./arcade review-plan PATH` or standard input. There is no plan-upload endpoint.
+
 ## Work through a mission
 
-Choose a lab from the directory, resume your current mission, or use **Surprise me** in the incident gauntlet. Incidents have neutral names so the directory does not disclose their causes. Open one incident at a time on your existing Game 07 cluster.
+Choose a lab from the directory, resume your current mission, or use **Surprise me** in the incident gauntlet. Incidents have neutral names so the directory does not disclose their causes. Open one incident at a time on your existing Game 07 cluster. Before starting, follow the displayed prerequisite Terraform setup order. The launcher links to each prerequisite; preparing its files does not verify live readiness. Complete its runbook checks before continuing.
 
 The sidebar’s **Plain-English glossary** explains unfamiliar terms with practical examples. The questions ask you to make a decision and explain its effect; they do not require memorized definitions.
 
@@ -66,11 +76,11 @@ The clock measures practice time, not cluster lifetime or AWS charges. Pausing i
 
 ## Save, export and restore progress
 
-Progress uses schema version 2 under the existing localStorage key `aws-interview-arcade:v1`. The key stays the same so existing version 1 notes and valid completion records migrate automatically. Migration does not invent completed guided stages.
+Progress uses schema version 3 under the existing localStorage key `aws-interview-arcade:v1`. The key stays the same so existing version 1 and 2 notes and valid completion records migrate automatically. Simulated drill state is a separate field. Migration does not invent completed guided stages.
 
 Storage belongs to the browser profile and origin. `localhost` and `127.0.0.1`, different ports, and different browser profiles have separate records. Clearing site data removes progress; private browsing may discard it on close. If browser storage is unavailable or full, the app warns you and retains a temporary in-memory copy. Export before closing.
 
-**Export progress** downloads a JSON backup of notes, evidence, checks and practice state. It records a paused snapshot of each clock at export time; it does not pause the live clock in your current session. **Restore backup** reads a version 1 or 2 JSON file locally, previews how many records can merge, and waits for **Merge backup**. The file is not uploaded. The maximum accepted size is 20 MiB (shown as 20 MB in the interface).
+**Export progress** downloads a JSON backup of mission notes, evidence, checks, practice state and simulated drill attempts. It records a paused snapshot of each clock at export time; it does not pause the live clock in your current session. **Restore backup** reads a version 1, 2 or 3 JSON file locally, previews how many records can merge, and waits for **Merge backup**. The file is not uploaded. The maximum accepted size is 20 MiB (shown as 20 MB in the interface).
 
 Restore merges complete mission records by update time. A newer record wins; an equal or older backup record leaves the current browser record intact. Unknown mission IDs are skipped. It does not combine conflicting text field by field, so export your current progress before merging valuable alternate notes. Restored clocks are paused and do not accrue the time between export and restore.
 
@@ -82,8 +92,7 @@ The Python suite covers the source catalog, guided lesson content, hint/answer b
 
 ```bash
 python3 -m unittest discover -s web/tests -p 'test_*.py' -v
-node web/tests/core.test.cjs
-node web/tests/practice.test.cjs
+node --test web/tests/*.test.cjs
 ```
 
 The HTTP tests use temporary fixtures and an ephemeral loopback port. No test provisions AWS infrastructure. See [the validation record](VALIDATION.md) for executed checks and their limitations, and [learning design](learning-design.md) for the teaching contract.
