@@ -90,7 +90,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_support_matrix_and_prerequisites_are_not_readiness(self):
         recipes = lab_manager.load_recipes(self.root)
-        expected = {'00','01','03','04','05','07','08', *(f'11-{i:02}' for i in range(1,11))}
+        expected = {'00','01','03','04','05','07','08','09','10','13', *(f'11-{i:02}' for i in range(1,11))}
         self.assertEqual({r['alias'] for r in recipes if runtime.support(r)}, expected)
         self.make('07','starter')
         info = runtime.Runtime(self.root,'08',runner=self.runner).describe()
@@ -122,9 +122,11 @@ class RuntimeTests(unittest.TestCase):
     def test_saved_plan_apply_decline_and_exact_binary(self):
         run = self.make()
         receipt = run.plan()
+        with self.assertRaisesRegex(ValueError, 'digest'):
+            run.apply(confirm=lambda _: f'APPLY {ACCOUNT}', plan_digest='a different reviewed plan')
         self.assertFalse(run.apply(confirm=lambda _: 'no'))
         self.assertFalse(any(c[0][1] == 'apply' for c in self.runner.calls))
-        self.assertTrue(run.apply(confirm=lambda _: f'APPLY {ACCOUNT}'))
+        self.assertTrue(run.apply(confirm=lambda _: f'APPLY {ACCOUNT}', plan_digest=receipt['digest']))
         argv = next(c[0] for c in self.runner.calls if len(c[0]) > 1 and c[0][1] == 'apply')
         self.assertEqual(argv[1:], ['apply','-input=false','-no-color',str(run.path / receipt['planFile'])])
 

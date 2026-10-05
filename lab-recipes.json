@@ -94,6 +94,13 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [
+          "Local Terraform built-in provider only."
+        ],
+        "activityBased": "No AWS usage."
       }
     },
     {
@@ -213,6 +220,13 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0.01,
+        "assumptions": [
+          "Allow $0.01 per hour for tiny S3 fixtures, versions and light request activity."
+        ],
+        "activityBased": "Illustrative light-use allowance. Storage, versions, requests and transfer depend on activity; delete all authored resources."
       }
     },
     {
@@ -351,7 +365,14 @@
           ]
         }
       },
-      "environmentPrerequisites": []
+      "environmentPrerequisites": [],
+      "sessionEstimate": {
+        "hourlyUsd": 0.01,
+        "assumptions": [
+          "Allow $0.01 per hour for tiny S3 fixtures, versions and light request activity."
+        ],
+        "activityBased": "Illustrative light-use allowance. Storage, versions, requests and transfer depend on activity; delete all authored resources."
+      }
     },
     {
       "id": "03-vpc-routing",
@@ -470,6 +491,11 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -589,6 +615,11 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -724,6 +755,13 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0.05,
+        "assumptions": [
+          "Allow $0.05 per hour for ten or fewer Lambda calls and a tiny DynamoDB counter."
+        ],
+        "activityBased": "Illustrative light-use allowance. Invocations, duration, database requests, retained data and logs vary with activity."
       }
     },
     {
@@ -819,6 +857,13 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [
+          "One CloudWatch log group with no ingestion."
+        ],
+        "activityBased": "Ingested and retained logs incur charges; no ingestion is assumed."
       }
     },
     {
@@ -938,6 +983,11 @@
             }
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1020,6 +1070,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1092,7 +1147,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
             },
             {
-              "title": "Build and review this lab’s AWS resources",
+              "title": "Build and review this lab\u2019s AWS resources",
               "command": "cat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\ncd \"$LAB_ROOT/run/09-pod-identity\"\n${EDITOR:-vi} main.tf\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
             },
             {
@@ -1182,7 +1237,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
             },
             {
-              "title": "Build and review this lab’s AWS resources",
+              "title": "Build and review this lab\u2019s AWS resources",
               "command": "cat \"$LAB_ROOT/labs/09-pod-identity/README.md\"\ncd \"$LAB_ROOT/run/09-pod-identity\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
             },
             {
@@ -1213,6 +1268,13 @@
             "workload"
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0.01,
+        "assumptions": [
+          "Allow $0.01 per hour for tiny S3 fixtures, versions and light request activity."
+        ],
+        "activityBased": "Illustrative light-use allowance. Storage, versions, requests and transfer depend on activity; delete all authored resources."
       }
     },
     {
@@ -1285,7 +1347,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
             },
             {
-              "title": "Build and review this lab’s AWS resources",
+              "title": "Build and review this lab\u2019s AWS resources",
               "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\ncd \"$LAB_ROOT/run/10-ebs-storage\"\n${EDITOR:-vi} main.tf\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
             },
             {
@@ -1371,7 +1433,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error."
             },
             {
-              "title": "Build and review this lab’s AWS resources",
+              "title": "Build and review this lab\u2019s AWS resources",
               "command": "cat \"$LAB_ROOT/labs/10-ebs-storage/README.md\"\ncd \"$LAB_ROOT/run/10-ebs-storage\"\nterraform init -lockfile=readonly\nterraform fmt\nterraform validate\nterraform plan -out=aws.tfplan\nterraform show aws.tfplan\nterraform apply aws.tfplan"
             },
             {
@@ -1398,6 +1460,13 @@
             "workload"
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0.00010958904109589041,
+        "assumptions": [
+          "One 1 GiB gp3 disk at $0.08/GiB-month, using 730 hours/month."
+        ],
+        "activityBased": "EBS bills until the actual disk is deleted, including after a failed workload cleanup."
       }
     },
     {
@@ -1410,7 +1479,12 @@
         "07-eks-foundation"
       ],
       "cost": "Reuses Game 07; choose one incident at a time and clean its namespace.",
-      "modes": {}
+      "modes": {},
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
+      }
     },
     {
       "id": "11-incident-gauntlet/scenario-01",
@@ -1496,6 +1570,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1582,6 +1661,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1668,6 +1752,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1754,6 +1843,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1840,6 +1934,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -1930,6 +2029,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -2016,6 +2120,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -2102,6 +2211,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -2188,6 +2302,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -2278,6 +2397,11 @@
             "."
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     },
     {
@@ -2293,11 +2417,16 @@
         "10-ebs-storage",
         "11-incident-gauntlet"
       ],
-      "cost": "Uses the whole-curriculum $20 allowance; reuse 07 and follow ordered teardown after 08–11.",
+      "cost": "Uses the whole-curriculum $20 allowance; reuse 07 and follow ordered teardown after 08\u201311.",
       "modes": {},
       "environmentPrerequisites": [
         "07-eks-foundation"
-      ]
+      ],
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
+      }
     },
     {
       "id": "13-public-access",
@@ -2369,7 +2498,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error.\n: \"${TF_VAR_lab_id:?Use the SAME lab ID as Game 07}\"\nexport CLUSTER_NAME=\"$TF_VAR_cluster_name\"\nexport LAB13_RUN=\"$LAB_ROOT/run/13-public-access\""
             },
             {
-              "title": "Check the worker and bind your laptop’s current public address",
+              "title": "Check the worker and bind your laptop\u2019s current public address",
               "command": "bash \"$LAB_ROOT/labs/13-public-access/preflight.sh\" > \"$LAB13_RUN/preflight.json\"\njq . \"$LAB13_RUN/preflight.json\"\njq '{expected_account_id: .account, region, lab_id, aws_profile, cluster_name, node_instance_id, allowed_cidr}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/access/terraform.tfvars.json\"\njq '{expected_account_id: .account, region, cluster_name, aws_profile}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/workload/terraform.tfvars.json\""
             },
             {
@@ -2447,7 +2576,7 @@
               "command": ": \"${LAB_ROOT:?Source scripts/env.sh first}\"\n: \"${AWS_PROFILE:?Export your authenticated AWS profile}\"\n: \"${TF_VAR_expected_account_id:?Export the intended 12-digit AWS account ID}\"\n: \"${LAB_KUBE_CONTEXT:?Complete Game 07 and export its Kubernetes context}\"\nexport TF_VAR_aws_profile=\"$AWS_PROFILE\"\nexport TF_VAR_cluster_name=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw cluster_name)\"\nexport TF_VAR_region=\"$(terraform -chdir=\"$LAB_ROOT/run/07-eks-foundation\" output -raw region)\"\nexport AWS_REGION=\"$TF_VAR_region\"\nexport AWS_DEFAULT_REGION=\"$AWS_REGION\"\ntest \"$(aws sts get-caller-identity --profile \"$AWS_PROFILE\" --region \"$AWS_REGION\" --query Account --output text)\" = \"$TF_VAR_expected_account_id\"\nkubectl --context \"$LAB_KUBE_CONTEXT\" cluster-info\n# Stop on any unexpected identity or connection error.\n: \"${TF_VAR_lab_id:?Use the SAME lab ID as Game 07}\"\nexport CLUSTER_NAME=\"$TF_VAR_cluster_name\"\nexport LAB13_RUN=\"$LAB_ROOT/run/13-public-access\""
             },
             {
-              "title": "Check the worker and bind your laptop’s current public address",
+              "title": "Check the worker and bind your laptop\u2019s current public address",
               "command": "bash \"$LAB_ROOT/labs/13-public-access/preflight.sh\" > \"$LAB13_RUN/preflight.json\"\njq . \"$LAB13_RUN/preflight.json\"\njq '{expected_account_id: .account, region, lab_id, aws_profile, cluster_name, node_instance_id, allowed_cidr}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/access/terraform.tfvars.json\"\njq '{expected_account_id: .account, region, cluster_name, aws_profile}' \"$LAB13_RUN/preflight.json\" > \"$LAB13_RUN/workload/terraform.tfvars.json\""
             },
             {
@@ -2466,6 +2595,11 @@
             "workload"
           ]
         }
+      },
+      "sessionEstimate": {
+        "hourlyUsd": 0,
+        "assumptions": [],
+        "activityBased": "No extra standing resources; follow the cleanup order."
       }
     }
   ]

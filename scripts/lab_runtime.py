@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUTS = 'arcade.auto.tfvars.json'
 SETTINGS = '.arcade-runtime.json'
 PLAN_RECEIPT = '.arcade-plan.json'
-SUPPORTED = {'00', '01', '03', '04', '05', '07', '08', *(f'11-{i:02}' for i in range(1, 11))}
+SUPPORTED = {'00', '01', '03', '04', '05', '07', '08', '09', '10', '13', *(f'11-{i:02}' for i in range(1, 11))}
+ROOT_ORDER = {'09': ['.', 'workload'], '10': ['.', 'workload'], '13': ['workload', 'access']}
 ADDONS = ('vpc-cni', 'kube-proxy', 'coredns', 'eks-pod-identity-agent')
 
 
@@ -112,7 +113,7 @@ def write_json(path, data):
 
 
 class Runtime:
-    def __init__(self, root, identifier, runner=None):
+    def __init__(self, root, identifier, runner=None, terraform_root=None):
         self.root = Path(root).absolute()
         if self.root.is_symlink():
             raise RuntimeError('Refusing symlink repository root.')
@@ -120,15 +121,21 @@ class Runtime:
         self.recipe = lab_manager.find_recipe(self.recipes, identifier)
         self.alias = self.recipe['alias']
         self.supported = support(self.recipe)
-        self.path = (lab_manager.contained_path(self.root, 'run/' + self.recipe['runDirectory'])
+        self.workspace = (lab_manager.contained_path(self.root, 'run/' + self.recipe['runDirectory'])
                      if self.recipe['runDirectory'] else None)
+        self.roots = ROOT_ORDER.get(self.alias, next(iter(self.recipe['modes'].values()), {}).get('terraformRoots', ['.']))
+        self.terraform_root = self.roots[0] if terraform_root is None else terraform_root
+        if self.terraform_root not in self.roots:
+            raise RuntimeError('Choose a registered Terraform root: ' + ', '.join(self.roots))
+        self.path = (lab_manager.contained_path(self.workspace, self.terraform_root)
+                     if self.workspace is not None else None)
         self.runner = runner or command_runner
         bundled = self.root / '.tools/bin/terraform'
         self.terraform = str(bundled) if bundled.is_file() else 'terraform'
 
     @property
     def workload(self):
-        return self.alias == '08' or self.alias.startswith('11-')
+        return self.alias in {'08', '09', '10', '13'} or self.alias.startswith('11-')
 
     def _workspace(self, *, supported=True):
         if supported and not self.supported:
@@ -138,13 +145,13 @@ class Runtime:
         lab_manager.contained_path(self.root, 'run/' + self.recipe['runDirectory'])
         if not self.path.is_dir():
             raise RuntimeError(f'Prepare Game {self.alias} first.')
-        session = lab_manager.session_receipt(self.path, self.recipe)
+        session = lab_manager.session_receipt(self.workspace, self.recipe)
         for local_path in ('.terraform', 'terraform.tfstate', 'terraform.tfstate.backup', INPUTS, SETTINGS, PLAN_RECEIPT):
             lab_manager.contained_path(self.path, local_path)
         if supported:
             roots = self.recipe['modes'][session['mode']].get('terraformRoots', ['.'])
-            if roots != ['.']:
-                raise RuntimeError('Only the registered single Terraform root is supported; use the runbook.')
+            if self.terraform_root not in roots:
+                raise RuntimeError('This Terraform root is not registered for the prepared mode.')
         return session
 
     @property
@@ -167,7 +174,7 @@ class Runtime:
     @contextmanager
     def _locked(self):
         self._workspace()
-        lockpath = lab_manager.contained_path(self.path, '.arcade-runtime.lock')
+        lockpath = lab_manager.contained_path(self.workspace, '.arcade-runtime.lock')
         with lockpath.open('a') as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -192,7 +199,8 @@ class Runtime:
     def prepare(self, mode=None):
         if self.path is None:
             raise RuntimeError(f'Follow this runbook; it has no standalone workspace: {self.runbook}')
-        path, selected, created = lab_manager.prepare(self.root, self.recipe, mode)
+        _, selected, created = lab_manager.prepare(self.root, self.recipe, mode)
+        path = self.path
         if self.supported:
             values = self._read(INPUTS)
             faults = {'04': ('policy_variant', 'broken'), '05': ('table_environment_key', 'COUNTER_TABLE')}
@@ -241,6 +249,27 @@ class Runtime:
                 raise RuntimeError('Apply Game 07 and configure its isolated context first.')
             inputs.update(aws_profile=profile, cluster_name=parent['cluster_name'])
             settings.update({key: parent[key] for key in ('cluster_name', 'context', 'kubeconfig')})
+            if self.alias in ROOT_ORDER and self.terraform_root != 'workload':
+                inputs['lab_id'] = parent['lab_id']
+                settings['lab_id'] = parent['lab_id']
+            if self.alias == '13' and self.terraform_root == 'access':
+                try:
+                    network = ipaddress.ip_network(allowed_cidr, strict=True)
+                    if network.version != 4 or network.prefixlen != 32:
+                        raise ValueError()
+                except (ValueError, TypeError) as exc:
+                    raise RuntimeError('Provide your allowed public IPv4 /32 CIDR for the public access root.') from exc
+                inputs['allowed_cidr'] = str(network)
+                nodes = foundation._ready()
+                if len(nodes) != 1:
+                    raise RuntimeError('Public access requires exactly one registered Game 07 worker.')
+                provider = nodes[0].get('spec', {}).get('providerID', '')
+                match = re.fullmatch(r'aws:///[a-z0-9-]+/(i-[0-9a-f]+)', provider)
+                if not match:
+                    raise RuntimeError('The registered worker has no valid EC2 provider identity.')
+                inputs['node_instance_id'] = match.group(1)
+            if self.alias in {'09', '10'} and self.terraform_root == 'workload':
+                self._wire_infrastructure(inputs, settings)
         else:
             maximum = 16 if self.alias in {'01', '03', '07'} else 20
             if not isinstance(lab_id, str) or not re.fullmatch(r'[a-z][a-z0-9-]{2,' + str(maximum - 1) + '}', lab_id):
@@ -276,6 +305,7 @@ class Runtime:
             data['lab_id'] = ask('Distinctive lab ID', previous.get('lab_id', ''))
         if self.alias == '07':
             data['admin_principal_arn'] = ask('Permanent IAM role/user ARN', values.get('admin_principal_arn', ''))
+        if self.alias == '07' or (self.alias == '13' and self.terraform_root == 'access'):
             data['allowed_cidr'] = ask('Your public IPv4 /32', values.get('allowed_cidr', ''))
         result = self.configure(**data)
         print(f'Inputs saved in {self.path / INPUTS}. Edit this Terraform input file for mission repairs.')
@@ -355,6 +385,84 @@ class Runtime:
         except (OSError, ValueError) as exc:
             raise RuntimeError('Prepare, apply and verify prerequisite Game 07 first.') from exc
         return foundation
+
+    def _sibling(self, root):
+        return Runtime(self.root, self.alias, runner=self.runner, terraform_root=root)
+
+    def _wire_infrastructure(self, inputs, settings):
+        infrastructure = self._sibling('.')
+        infrastructure._workspace()
+        if not infrastructure._state_digest():
+            raise RuntimeError('Apply this mission\'s infrastructure root first; its outputs are required by workload.')
+        data = infrastructure._settings()
+        if any(data.get(key) != settings.get(key) for key in ('profile', 'account_id', 'region', 'cluster_name')):
+            raise RuntimeError('Infrastructure and workload must use the same foundation identity.')
+        outputs = json.loads(infrastructure._tf('output', '-json', capture=True))
+        if self.alias == '09':
+            bucket = outputs.get('bucket_name', {}).get('value')
+            if not isinstance(bucket, str) or not re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]', bucket):
+                raise RuntimeError('Infrastructure output bucket_name is missing or invalid; apply infrastructure first.')
+            fixture = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'fixture', 'namespace': 'arcade-identity'},
+                       'data': {'bucket': bucket, 'region': settings['region']}}
+            target = lab_manager.contained_path(self.path, 'fixture.yaml')
+            previous = self._read(SETTINGS).get('fixtureDigest')
+            if target.exists() and digest(target) != previous:
+                # A manually authored fixture remains the learner's file.
+                try:
+                    same = json.loads(target.read_text()) == fixture
+                except ValueError:
+                    same = False
+                if not same:
+                    raise RuntimeError('Existing fixture.yaml edits preserved. Review the infrastructure outputs and fixture before configuring.')
+            write_json(target, fixture)
+            settings['fixtureDigest'] = digest(target)
+            paths = inputs.get('extra_manifest_paths', [])
+            if not isinstance(paths, list):
+                raise RuntimeError('extra_manifest_paths must remain a list; preserve and inspect learner inputs.')
+            inputs['extra_manifest_paths'] = list(dict.fromkeys([*paths, 'fixture.yaml']))
+        elif not outputs.get('addon_version', {}).get('value') or not outputs.get('csi_role_arn', {}).get('value'):
+            raise RuntimeError('Infrastructure outputs addon_version and csi_role_arn are required before the storage workload.')
+        settings['infrastructureStateDigest'] = infrastructure._state_digest()
+
+    def _root_dependencies(self, operation):
+        order = ROOT_ORDER[self.alias]
+        index = order.index(self.terraform_root)
+        if operation == 'destroy':
+            for later in order[index + 1:]:
+                observation = lab_manager.state_summary(self._sibling(later).path)
+                if observation['managedObjects'] != 0:
+                    raise RuntimeError(f'Destroy dependent root {later} first; its state is active or unknown.')
+            if self.alias == '10' and self.terraform_root == '.':
+                self._storage_absence()
+            return
+        if index == 0:
+            return
+        parent = self._sibling(order[index - 1])
+        if lab_manager.state_summary(parent.path)['managedObjects'] in (None, 0):
+            raise RuntimeError(f'Apply prerequisite root {parent.terraform_root} first; infrastructure outputs/state are missing.')
+        settings, parent_settings = self._settings(), parent._settings()
+        if any(settings.get(key) != parent_settings.get(key) for key in ('profile', 'account_id', 'region', 'cluster_name')):
+            raise RuntimeError('Prerequisite roots must use the same foundation identity. Configure and review again.')
+        if self.alias in {'09', '10'}:
+            if self._settings().get('infrastructureStateDigest') != parent._state_digest():
+                raise RuntimeError('Infrastructure outputs/state changed. Configure workload again, then review a fresh plan.')
+            if self.alias == '10':
+                data = self._settings()
+                addon = self._aws('eks', 'describe-addon', '--cluster-name', data['cluster_name'], '--addon-name', 'aws-ebs-csi-driver').get('addon', {})
+                if addon.get('status') != 'ACTIVE' or addon.get('health', {}).get('issues'):
+                    raise RuntimeError('The EBS CSI driver is not healthy; complete the infrastructure acceptance checks first.')
+
+    def _storage_absence(self):
+        # Keep the controller alive until Kubernetes has released the disk. This
+        # is an observation only; never delete a volume discovered by tag search.
+        for args in [('get', 'namespace', 'arcade-storage', '--ignore-not-found', '-o', 'name'),
+                     ('get', 'storageclass', 'arcade-gp3', '--ignore-not-found', '-o', 'name')]:
+            if self._kubectl(*args, capture=True).strip():
+                raise RuntimeError('Storage workload still exists; retain the CSI infrastructure until its cleanup completes.')
+        volumes = self._aws('ec2', 'describe-volumes', '--filters',
+                            'Name=tag:Project,Values=aws-interview-arcade', 'Name=tag:Lab,Values=10').get('Volumes')
+        if volumes is None or volumes:
+            raise RuntimeError('Storage volume absence is not established. Inspect Game 10 volume ownership; retain the controller and foundation.')
 
     def _cluster(self):
         data = self._settings()
@@ -438,9 +546,11 @@ class Runtime:
 
     def _fingerprint(self):
         entries = {}
-        excluded = {SETTINGS, PLAN_RECEIPT, 'kubeconfig.json', 'session-env.sh'}
+        excluded = {SETTINGS, PLAN_RECEIPT, '.arcade-session.json', 'kubeconfig.json', 'session-env.sh'}
         for directory, dirs, files in os.walk(self.path, followlinks=False):
             dirs[:] = sorted(name for name in dirs if name not in {'.terraform', '.git', '__pycache__'})
+            if Path(directory) == self.path and self.terraform_root == '.' and self.alias in ROOT_ORDER:
+                dirs[:] = [name for name in dirs if name not in self.roots]
             for name in dirs:
                 if (Path(directory) / name).is_symlink():
                     raise RuntimeError('Refusing symlinked configuration directory.')
@@ -450,7 +560,7 @@ class Runtime:
                     continue
                 if path.suffix in {'.tf', '.json', '.tfvars', '.hcl', '.yaml', '.yml', '.py', '.sh'}:
                     entries[str(path.relative_to(self.path))] = digest(path)
-        entries['runtimeIdentity'] = self._settings()
+        entries['runtimeIdentity'] = self._read(SETTINGS)
         # Status is operational bookkeeping, not reviewed Terraform input.
         entries['runtimeIdentity'] = {k: v for k, v in entries['runtimeIdentity'].items() if k not in {'status', 'baselineProof', 'baselineState'}}
         return hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest()
@@ -498,6 +608,8 @@ class Runtime:
     def _preflight(self, operation):
         identity = self._identity()
         context = None
+        if self.alias in ROOT_ORDER:
+            self._root_dependencies(operation)
         if self.workload:
             context = self._context()
             if operation != 'destroy':
@@ -526,7 +638,7 @@ class Runtime:
             if self.alias == '11-10' and settings.get('phase') == 'baseline' and operation == 'apply':
                 if digest(self.path / 'candidate.yaml') != digest(self.path / 'baseline.yaml'):
                     raise RuntimeError('Scenario 11-10 must apply the healthy baseline before the broken update. Restore candidate.yaml from baseline.yaml explicitly.')
-            print(f"\nOperation: {operation.upper()} | Account: {identity['account']} | Profile: {identity['profile'] or 'none'} | Region: {identity['region'] or 'local'}\nWorkspace: {self.path}\n{self.recipe['cost']}\nTotal practice allowance: $20. Review ownership and costs before approval.")
+            print(f"\nOperation: {operation.upper()} | Account: {identity['account']} | Profile: {identity['profile'] or 'none'} | Region: {identity['region'] or 'local'}\nWorkspace: {self.path}\n{self.recipe['cost']}\nReview ownership and estimates before approval; estimates are not a billing cap.")
             init = ['init', '-input=false', '-no-color']
             if (self.path / '.terraform.lock.hcl').exists():
                 init.append('-lockfile=readonly')
@@ -546,11 +658,13 @@ class Runtime:
             # is displayed; JSON values are never stored as an extra artifact.
             from plan_review import review_plan, format_review
             document = json.loads(self._tf('show', '-json', str(plan_path), capture=True))
-            print(format_review(review_plan(document)))
+            review = review_plan(document)
+            print(format_review(review))
             receipt = {'schemaVersion': 1, 'labId': self.recipe['id'], 'workspace': str(self.path),
                        'operation': operation, 'phase': settings.get('phase', 'practice'), 'planFile': plan_name,
                        'digest': digest(plan_path), 'fingerprint': self._fingerprint(),
-                       'stateDigest': self._state_digest(), 'identity': identity, 'contextDigest': context, 'consumed': False}
+                       'stateDigest': self._state_digest(), 'identity': identity, 'contextDigest': context, 'consumed': False,
+                       'review': review}
             write_json(self.path / PLAN_RECEIPT, receipt)
             print(f'Reviewed plan saved. Apply saved plan requires typing {operation.upper()} {identity["account"]}.')
             return receipt
@@ -570,9 +684,11 @@ class Runtime:
             raise RuntimeError('Account, region or context changed after plan review. Plan again.')
         return identity
 
-    def apply(self, confirm=input):
+    def apply(self, confirm=input, *, plan_digest=None):
         with self._locked():
             receipt = self._read(PLAN_RECEIPT)
+            if plan_digest is not None and receipt.get('digest') != plan_digest:
+                raise RuntimeError('Saved plan digest differs from the reviewed plan. Review the current plan again.')
             identity = self._check_plan(receipt)
             phrase = receipt['operation'].upper() + ' ' + identity['account']
             print(f"Workspace: {self.path}\nProfile: {identity['profile'] or 'none'} | Region: {identity['region'] or 'local'}\nSaved operation: {receipt['operation']} | Account: {identity['account']}")
@@ -642,7 +758,8 @@ class Runtime:
                 result['liveChecks'].append('EKS ACTIVE, four addons ACTIVE without reported issues, workers Ready at observation time')
             elif self.workload and settings.get('status') != 'destroyed':
                 self._context()
-                namespace = 'arcade-app' if self.alias == '08' else 'arcade-incident-' + self.alias[-2:]
+                namespace = {'08': 'arcade-app', '09': 'arcade-identity', '10': 'arcade-storage',
+                             '13': 'arcade-public'}.get(self.alias, 'arcade-incident-' + self.alias[-2:])
                 self._kubectl('-n', namespace, 'get', 'pods', '-o', 'wide')
                 result['liveChecks'].append('Kubernetes pod listing from the explicit lab context; not HTTP acceptance')
                 if self.alias == '11-10' and settings.get('phase') == 'baseline':

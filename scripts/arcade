@@ -14,6 +14,7 @@ case "$ARCADE_COMMAND" in
   tui) exec python3 "$ARCADE_ROOT/scripts/arcade_tui.py" "$@" ;;
   verify) exec python3 "$ARCADE_ROOT/scripts/verify-lab.py" "$@" ;;
   smoke) exec python3 "$ARCADE_ROOT/scripts/smoke-aws.py" "$@" ;;
+  session) exec python3 "$ARCADE_ROOT/scripts/lab_session.py" "$@" ;;
   labs|start|next|status) exec python3 "$ARCADE_ROOT/scripts/lab_manager.py" "$ARCADE_COMMAND" "$@" ;;
   check) exec python3 "$ARCADE_ROOT/scripts/local-check.py" "$@" ;;
   root) printf '%s\n' "$ARCADE_ROOT" ;;
@@ -37,6 +38,7 @@ From a fresh checkout, use ./arcade COMMAND. No PATH setup is needed.
   arcade start ID     Prepare practice files locally (use --mode guided for guided code)
   arcade next ID      Print commands for an existing practice workspace
   arcade status       Inspect local sessions and state counts; never queries AWS
+  arcade session ...  Shared cloud-session operations; use --help for roots and approval
   arcade check 00|05  Run local rehearsal checks; use --workspace PATH
   arcade verify ...   Read-only AWS/EKS checks; use --help for required context
   arcade smoke ...    Scoped AWS smoke test; use --help before preparing a run
