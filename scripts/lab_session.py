@@ -161,7 +161,7 @@ class Session:
                                    or repair.get('stateDigest') != runtime._state_digest())
             except (OSError, ValueError):
                 repair['stale'] = True
-        if plan and not plan['consumed'] and not plan['stale']:
+        if status != 'applying' and plan and not plan['consumed'] and not plan['stale']:
             status = 'planned'
         next_action = 'prepare' if not info['prepared'] else 'plan'
         if info['prepared'] and runtime.alias != '00' and not settings.get('profile'):
@@ -179,6 +179,10 @@ class Session:
             next_action = 'plan'
         if not runtime.supported:
             next_action = 'follow the ordered runbook'
+        if settings.get('cleanupOnly') and status not in {'planned', 'destroyed', 'applying'}:
+            next_action = 'plan cleanup or configure for practice'
+        if status == 'applying':
+            next_action = 'wait for the current operation'
         capabilities = list(OPERATIONS[:-1]) if runtime.supported else (['prepare'] if runtime.path else [])
         if runtime.alias == '11-10':
             capabilities.append('begin_incident')
@@ -291,8 +295,7 @@ class Session:
             if operation == 'prepare':
                 runtime.prepare(**parameters)
             elif operation == 'configure':
-                with runtime._locked():
-                    result = runtime.configure(**parameters)
+                result = runtime.configure(**parameters)
             elif operation in {'plan', 'plan_destroy'}:
                 if parameters:
                     raise ValueError('Plan takes no additional parameters.')

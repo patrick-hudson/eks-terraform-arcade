@@ -147,6 +147,136 @@ class SessionTests(unittest.TestCase):
                 self.assertEqual(values['extra_manifest_paths'], ['fixture.yaml'])
         self.assertFalse(any(call[0][0] in {'bash', 'sh'} for call in original.calls))
 
+    def test_partial_infrastructure_can_clean_unused_workload_without_creation_outputs(self):
+        self.foundation()
+        original = self.runner
+        outputs_ready = False
+
+        def runner(args, cwd, env, *, capture=False):
+            result = original(args, cwd, env, capture=capture)
+            if args[0].endswith('terraform'):
+                if args[1:3] == ['output', '-json'] and Path(cwd).name in {'09-pod-identity', '10-ebs-storage'}:
+                    # The failed infrastructure apply created its IAM role, but
+                    # never produced the output required to start the exercise.
+                    outputs = {'csi_role_arn': {'value': f'arn:aws:iam::{ACCOUNT}:role/learner-ebs'}}
+                    if outputs_ready:
+                        outputs.update(bucket_name={'value': 'learner-fixture'}, addon_version={'value': 'v1'})
+                    result.stdout = json.dumps(outputs)
+                if args[1] == 'apply' and args[-1].endswith('arcade-destroy.tfplan') and not result.returncode:
+                    Path(cwd, 'terraform.tfstate').write_text(json.dumps({'version': 4, 'resources': []}))
+            elif args[0] == 'aws' and 'describe-volumes' in args:
+                result.stdout = json.dumps({'Volumes': []})
+            return result
+
+        self.runner = runner
+        for alias in ('09', '10'):
+            with self.subTest(alias=alias):
+                outputs_ready = False
+                infrastructure = self.session(alias, '.')
+                infrastructure.perform('prepare', mode='guided')
+                infrastructure.perform('configure', profile='learner', account_id=ACCOUNT)
+                Path(infrastructure.runtime.path, 'terraform.tfstate').write_text(json.dumps({
+                    'version': 4, 'resources': [{'mode': 'managed', 'type': 'aws_iam_role',
+                    'name': 'partial', 'instances': [{'attributes': {'id': 'owned-partial-role'}}]}]}))
+                infrastructure.runtime._save(status='failed')
+                workload = self.session(alias, 'workload')
+                with self.assertRaisesRegex(ValueError, 'output'):
+                    workload.perform('configure', profile='learner', account_id=ACCOUNT)
+                with self.assertRaisesRegex(ValueError, 'workload'):
+                    infrastructure.perform('plan_destroy')
+                self.assertFalse((workload.runtime.path / 'terraform.tfstate').exists())
+
+                planned = workload.perform('plan_destroy')
+                plan = planned['plan']
+                self.assertEqual(plan['operation'], 'destroy')
+                self.assertTrue(workload.runtime._read(lab_runtime.SETTINGS)['cleanupOnly'])
+                self.assertEqual(planned['inventory']['absence'], 'unknown')
+                self.assertFalse((workload.runtime.path / 'terraform.tfstate').exists())
+                with self.assertRaisesRegex(ValueError, 'workload'):
+                    infrastructure.perform('plan_destroy')
+                with self.assertRaisesRegex(ValueError, 'cleanup|Configure'):
+                    workload.perform('plan')
+                with self.assertRaisesRegex(ValueError, 'output'):
+                    workload.perform('configure', profile='learner', account_id=ACCOUNT)
+                self.assertTrue(workload.runtime._read(lab_runtime.SETTINGS)['cleanupOnly'])
+
+                before = len(original.calls)
+                workload.perform('apply', approval='not approved', plan_digest=plan['digest'])
+                self.assertFalse(any(c[0][1] == 'apply' for c in original.calls[before:]))
+
+                original.fail_apply = True
+                with self.assertRaisesRegex(ValueError, 'preserved'):
+                    workload.perform('apply', approval=f'DESTROY {ACCOUNT}', plan_digest=plan['digest'])
+                self.assertFalse((workload.runtime.path / 'terraform.tfstate').exists())
+                with self.assertRaisesRegex(ValueError, 'workload'):
+                    infrastructure.perform('plan_destroy')
+                original.fail_apply = False
+                workload.perform('apply', approval=f'DESTROY {ACCOUNT}', plan_digest=plan['digest'])
+                self.assertEqual(workload.describe()['inventory']['absence'], 'unknown')
+                self.assertEqual(infrastructure.perform('plan_destroy')['plan']['operation'], 'destroy')
+                self.assertTrue(infrastructure.runtime.path.exists())
+                outputs_ready = True
+                workload.perform('configure', profile='learner', account_id=ACCOUNT)
+                self.assertFalse(workload.runtime._read(lab_runtime.SETTINGS)['cleanupOnly'])
+                self.assertEqual(workload.perform('plan')['plan']['operation'], 'apply')
+
+    def test_cleanup_configuration_preserves_identity_and_live_context_guards(self):
+        foundation = self.foundation()
+        workload = self.session('10', 'workload')
+        workload.perform('prepare', mode='guided')
+        foreign = {'aws_profile': 'someone-else', 'expected_account_id': '999999999999'}
+        lab_runtime.write_json(workload.runtime.path / lab_runtime.INPUTS, foreign)
+        before = len(self.runner.calls)
+        with self.assertRaisesRegex(ValueError, 'identity|inputs'):
+            workload.perform('plan_destroy')
+        self.assertEqual(workload.runtime._read(lab_runtime.INPUTS), foreign)
+        self.assertFalse(any(c[0][1] == 'plan' for c in self.runner.calls[before:]))
+        lab_runtime.write_json(workload.runtime.path / lab_runtime.INPUTS, {})
+        self.runner.account = '999999999999'
+        before = len(self.runner.calls)
+        with self.assertRaisesRegex(ValueError, 'account'):
+            workload.perform('plan_destroy')
+        self.assertFalse(any(c[0][1] == 'plan' for c in self.runner.calls[before:]))
+        self.runner.account = ACCOUNT
+        lab_runtime.write_json(foundation.runtime.path / 'kubeconfig.json', {'unexpected': 'context'})
+        before = len(self.runner.calls)
+        with self.assertRaisesRegex(ValueError, 'context'):
+            workload.perform('plan_destroy')
+        self.assertFalse(any(c[0][1] == 'plan' for c in self.runner.calls[before:]))
+
+    def test_applying_status_and_wait_take_precedence_over_plan_hints(self):
+        session = self.session()
+        session.perform('prepare', mode='guided')
+        session.perform('plan')
+        session.runtime._save(status='applying')
+        self.assertEqual(session.describe()['status'], 'applying')
+        self.assertEqual(session.describe()['nextAction'], 'wait for the current operation')
+        record = session._record()
+        record['appliedSourceFingerprint'] = 'an earlier applied revision'
+        session._save(record)
+        path = session.runtime.path / 'main.tf'
+        path.write_text(path.read_text() + '\n# changed during observation\n')
+        self.assertTrue(session.describe()['plan']['stale'])
+        self.assertEqual(session.describe()['status'], 'applying')
+        self.assertEqual(session.describe()['nextAction'], 'wait for the current operation')
+
+    def test_real_terraform_destroy_of_unused_root_writes_empty_state(self):
+        terraform = ROOT / '.tools/bin/terraform'
+        if not terraform.is_file():
+            terraform = shutil.which('terraform')
+        if not terraform:
+            self.skipTest('Terraform is unavailable')
+        session = Session(self.root, '00')
+        session.runtime.terraform = str(terraform)
+        session.perform('prepare', mode='guided')
+        state = session.runtime.path / 'terraform.tfstate'
+        self.assertFalse(state.exists())
+        plan = session.perform('plan_destroy')['plan']
+        self.assertFalse(state.exists())
+        session.perform('apply', approval='DESTROY LOCAL', plan_digest=plan['digest'])
+        self.assertEqual(json.loads(state.read_text())['resources'], [])
+        self.assertEqual(session.describe()['inventory']['absence'], 'unknown')
+
     def test_broken_service_fails_even_when_pods_are_ready(self):
         from test_verification import FakeRunner as VerifyRunner, FIXTURES
         self.foundation()

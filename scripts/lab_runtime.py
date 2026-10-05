@@ -231,6 +231,37 @@ class Runtime:
 
     def configure(self, *, profile=None, account_id=None, region='us-west-2', lab_id=None,
                   admin_principal_arn=None, allowed_cidr=None):
+        with self._locked():
+            return self._configure(profile=profile, account_id=account_id, region=region, lab_id=lab_id,
+                                   admin_principal_arn=admin_principal_arn, allowed_cidr=allowed_cidr)
+
+    def _guard_configuration(self, *, profile, account_id, region):
+        scopes = [self._sibling(root) for root in self.roots]
+        saved = [(scope, scope._read(SETTINGS)) for scope in scopes]
+        pinned = [(scope, data) for scope, data in saved if data.get('account_id')]
+        observations = [lab_manager.state_summary(scope.path) for scope in scopes]
+        uncertain = any(state['managedObjects'] != 0 for state in observations)
+        if not pinned and any(state['managedObjects'] != 0 and state['status'] != 'no-local-state'
+                              for state in observations):
+            raise RuntimeError('Existing Terraform state has no configured account identity. Preserve the workspace and recover its original identity before configuring.')
+        changing_scope = any((data.get('account_id'), data.get('region')) != (account_id, region)
+                             for _, data in pinned)
+        if uncertain and changing_scope:
+            raise RuntimeError('Account and region are pinned while any Terraform root has active or unknown state. Clean up each root with its original identity before changing accounts.')
+        if self.alias == '07' and changing_scope:
+            self._dependents()
+        changed_profile = next(((scope, data) for scope, data in pinned
+                                if data.get('profile') and data['profile'] != profile), None)
+        if changed_profile:
+            # Validate only profile changes, using explicit CLI flags and the
+            # existing environment scrubber before persisting any new identity.
+            scope, _ = changed_profile
+            observed = json.loads(scope._invoke(['aws', '--profile', profile, '--region', region,
+                                  'sts', 'get-caller-identity', '--output', 'json'], capture=True))
+            if not isinstance(observed, dict) or observed.get('Account') != account_id:
+                raise RuntimeError('The new AWS profile does not resolve to the configured account. Existing inputs and saved plans are preserved.')
+
+    def _configure(self, *, profile, account_id, region, lab_id, admin_principal_arn, allowed_cidr):
         self._workspace()
         if self.alias == '00':
             return self._read(SETTINGS)
@@ -240,9 +271,10 @@ class Runtime:
             raise RuntimeError('Configure the intended 12-digit AWS account ID.')
         if region != 'us-west-2':
             raise RuntimeError('This terminal workflow requires region us-west-2. Use the runbook for a different region.')
+        self._guard_configuration(profile=profile, account_id=account_id, region=region)
         inputs = self._read(INPUTS)
         inputs.update(expected_account_id=account_id, region=region)
-        settings = {'profile': profile, 'account_id': account_id, 'region': region}
+        settings = {'profile': profile, 'account_id': account_id, 'region': region, 'cleanupOnly': False}
         if self.workload:
             foundation = self._foundation()
             parent = foundation._settings()
@@ -291,6 +323,38 @@ class Runtime:
             inputs.update(admin_principal_arn=admin_principal_arn, allowed_cidr=str(network))
         write_json(self.path / INPUTS, inputs)
         return self._save(**settings)
+
+    def _configure_cleanup(self):
+        """Resolve only provider identity for an unused multi-root workload.
+
+        Creation output wiring may be impossible after a partial infrastructure
+        apply. A reviewed destroy still needs the same account and live cluster,
+        but does not need a bucket fixture or a successfully installed CSI addon.
+        Terraform itself must establish an empty state; missing state stays unknown.
+        """
+        if self.alias not in {'09', '10'} or self.terraform_root != 'workload':
+            return
+        current = self._read(SETTINGS)
+        identity_keys = ('profile', 'account_id', 'region')
+        if any(current.get(key) for key in identity_keys):
+            # Preserve existing configuration, including partially edited identity.
+            # The ordinary settings/context checks diagnose it without rewriting it.
+            return
+        parent = self._foundation()._settings()
+        self._guard_configuration(profile=parent['profile'], account_id=parent['account_id'], region=parent['region'])
+        context_keys = ('cluster_name', 'context', 'kubeconfig')
+        if not all(parent.get(key) for key in context_keys):
+            raise RuntimeError('Cleanup requires the registered Game 07 context. Preserve state and recover its connection using the runbook.')
+        inputs = self._read(INPUTS)
+        expected = {'aws_profile': parent['profile'], 'expected_account_id': parent['account_id'],
+                    'region': parent['region'], 'cluster_name': parent['cluster_name']}
+        if any(key in inputs and inputs[key] != value for key, value in expected.items()):
+            raise RuntimeError('Existing workload identity inputs differ from Game 07. Preserve and inspect them before cleanup.')
+        inputs.update(expected)
+        write_json(self.path / INPUTS, inputs)
+        self._save(**{key: parent[key] for key in (*identity_keys, *context_keys)}, cleanupOnly=True)
+        print('Cleanup-only configuration uses the registered Game 07 identity and context. '
+              'Normal configuration is still required before creating this workload.')
 
     def configure_interactive(self, input_fn=input):
         self._workspace()
@@ -434,7 +498,10 @@ class Runtime:
             for later in order[index + 1:]:
                 observation = lab_manager.state_summary(self._sibling(later).path)
                 if observation['managedObjects'] != 0:
-                    raise RuntimeError(f'Destroy dependent root {later} first; its state is active or unknown.')
+                    raise RuntimeError(f'Destroy dependent root {later} first; its state is active or unknown. '
+                                       f'Select {later} and choose Plan cleanup, or run '
+                                       f'arcade session plan_destroy {self.alias} --root {later}, then review and apply that saved plan. '
+                                       'An unused workload still needs this Terraform cleanup; do not delete its workspace.')
             if self.alias == '10' and self.terraform_root == '.':
                 self._storage_absence()
             return
@@ -609,6 +676,8 @@ class Runtime:
             raise RuntimeError('Foundation destroy blocked by active or unknown dependent workspaces: ' + ', '.join(blocked) + '. Complete their Terraform cleanup and inspect disks first.')
 
     def _preflight(self, operation):
+        if operation != 'destroy' and self._read(SETTINGS).get('cleanupOnly'):
+            raise RuntimeError('This workload is configured for cleanup only. Configure it normally after infrastructure outputs are ready before planning changes.')
         identity = self._identity()
         context = None
         if self.alias in ROOT_ORDER:
@@ -636,6 +705,8 @@ class Runtime:
         if operation not in {'apply', 'destroy'}:
             raise RuntimeError('Operation must be apply or destroy.')
         with self._locked():
+            if operation == 'destroy':
+                self._configure_cleanup()
             identity, context = self._preflight(operation)
             settings = self._settings()
             if self.alias == '11-10' and settings.get('phase') == 'baseline' and operation == 'apply':

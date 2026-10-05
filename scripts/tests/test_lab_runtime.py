@@ -119,6 +119,87 @@ class RuntimeTests(unittest.TestCase):
             run.plan()
         self.assertFalse(any(c[0][0].endswith('terraform') for c in self.runner.calls))
 
+    def test_configured_account_is_pinned_while_state_is_active_or_unknown(self):
+        run = self.make('04')
+        run.plan()
+        protected = [runtime.INPUTS, runtime.SETTINGS, runtime.PLAN_RECEIPT, 'arcade-apply.tfplan']
+        before = {name: (run.path / name).read_bytes() for name in protected}
+        for state in (None, '{malformed', json.dumps({'version': 4, 'resources': [
+                {'mode': 'managed', 'instances': [{'attributes': {'id': 'role-with-account-local-name'}}]}]})):
+            with self.subTest(state=state):
+                if state is not None:
+                    (run.path / 'terraform.tfstate').write_text(state)
+                for changes in ({'account_id': '999999999999'}, {'region': 'us-east-1'}):
+                    arguments = dict(profile='learner', account_id=ACCOUNT, lab_id='learner')
+                    arguments.update(changes)
+                    with self.assertRaisesRegex(ValueError, 'pinned|region'):
+                        run.configure(**arguments)
+                    self.assertEqual({name: (run.path / name).read_bytes() for name in protected}, before)
+        run.configure(profile='learner', account_id=ACCOUNT, lab_id='another-lab')
+        self.assertEqual(run._read(runtime.INPUTS)['lab_id'], 'another-lab')
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            run.apply(confirm=lambda _: f'APPLY {ACCOUNT}')
+
+    def test_profile_change_checks_pinned_account_before_writing(self):
+        run = self.make('04')
+        run.plan()
+        names = [runtime.INPUTS, runtime.SETTINGS, runtime.PLAN_RECEIPT, 'arcade-apply.tfplan']
+        before = {name: (run.path / name).read_bytes() for name in names}
+        self.runner.account = '999999999999'
+        with self.assertRaisesRegex(ValueError, 'account'):
+            run.configure(profile='another-profile', account_id=ACCOUNT, lab_id='learner')
+        self.assertEqual({name: (run.path / name).read_bytes() for name in names}, before)
+        self.runner.account = ACCOUNT
+        run.configure(profile='another-profile', account_id=ACCOUNT, lab_id='learner')
+        self.assertEqual(run._read(runtime.SETTINGS)['profile'], 'another-profile')
+        self.assertTrue(any('get-caller-identity' in args and args[args.index('--profile') + 1] == 'another-profile'
+                            for args, _, _ in self.runner.calls))
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            run.apply(confirm=lambda _: f'APPLY {ACCOUNT}')
+
+    def test_initial_configuration_refuses_unowned_existing_state_and_configure_is_locked(self):
+        run = runtime.Runtime(self.root, '04', runner=self.runner)
+        run.prepare('guided')
+        original = (run.path / runtime.INPUTS).read_bytes()
+        for state in ('{malformed', json.dumps({'version': 4, 'resources': [
+                {'mode': 'managed', 'instances': [{}]}]})):
+            (run.path / 'terraform.tfstate').write_text(state)
+            with self.assertRaisesRegex(ValueError, 'identity|configured'):
+                run.configure(profile='learner', account_id=ACCOUNT, lab_id='learner')
+            self.assertEqual((run.path / runtime.INPUTS).read_bytes(), original)
+        (run.path / 'terraform.tfstate').unlink()
+        with run._locked():
+            with self.assertRaisesRegex(ValueError, 'Another lifecycle'):
+                run.configure(profile='learner', account_id=ACCOUNT, lab_id='learner')
+        run.configure(profile='learner', account_id=ACCOUNT, lab_id='learner')
+
+    def test_rebinding_after_empty_state_still_checks_unknown_siblings_and_foundation_dependents(self):
+        foundation = self.foundation()
+        run = runtime.Runtime(self.root, '10', runner=self.runner)
+        run.prepare('guided')
+        run.configure(profile='learner', account_id=ACCOUNT)
+        empty = json.dumps({'version': 4, 'resources': []})
+        (foundation.path / 'terraform.tfstate').write_text(empty)
+        (run.path / 'terraform.tfstate').write_text(empty)
+        with self.assertRaisesRegex(ValueError, 'dependent|pinned'):
+            foundation.configure(profile='learner', account_id='999999999999', lab_id='learner',
+                                 admin_principal_arn='arn:aws:iam::999999999999:user/learner', allowed_cidr='198.51.100.8/32')
+        # Model an independently recovered foundation in the new account to
+        # prove that a sibling's unknown state still prevents root rebinding.
+        foundation._save(account_id='999999999999')
+        values = foundation._read(runtime.INPUTS)
+        values['expected_account_id'] = '999999999999'
+        runtime.write_json(foundation.path / runtime.INPUTS, values)
+        with self.assertRaisesRegex(ValueError, 'pinned'):
+            run.configure(profile='learner', account_id='999999999999')
+        workload = runtime.Runtime(self.root, '10', runner=self.runner, terraform_root='workload')
+        with self.assertRaisesRegex(ValueError, 'pinned'):
+            workload.configure(profile='learner', account_id='999999999999')
+        self.assertFalse((workload.path / runtime.INPUTS).exists())
+        (run.path / 'workload/terraform.tfstate').write_text(empty)
+        run.configure(profile='learner', account_id='999999999999')
+        self.assertEqual(run._read(runtime.SETTINGS)['account_id'], '999999999999')
+
     def test_clients_cannot_change_a_foundation_and_dependent_concurrently(self):
         foundation = runtime.Runtime(self.root, '07', runner=self.runner)
         dependent = runtime.Runtime(self.root, '11-01', runner=self.runner)
