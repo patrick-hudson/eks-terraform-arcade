@@ -21,6 +21,135 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class TuiTests(unittest.TestCase):
+    def desk(self):
+        screen = Mock()
+        screen.getmaxyx.return_value = (30, 110)
+        with patch.object(tui.curses, 'has_colors', return_value=False), \
+             patch.object(tui.curses, 'curs_set'), patch.object(tui.curses, 'set_escdelay'):
+            return tui.Desk(screen, ROOT)
+
+    def test_catalog_search_matches_symptoms_and_preserves_return_position(self):
+        desk = self.desk()
+        desk.queries['missions'] = 'imagepullbackoff'
+        matches = desk.choices()
+        self.assertIn('11-01', [value['alias'] for _, (_, value) in matches])
+        desk.queries['missions'] = 'public path'
+        self.assertEqual(desk.choices()[0][1][1]['alias'], '13')
+        desk.activate()
+        self.assertEqual(desk.selected['alias'], '13')
+        desk.back()
+        self.assertEqual(desk.queries['missions'], 'public path')
+        self.assertEqual(desk.choices()[desk.index][1][1]['alias'], '13')
+        desk.queries['missions'] = 'no-such-symptom-ever'
+        self.assertEqual(desk.choices(), [])
+        desk.activate()  # An empty search never starts a command.
+
+    def test_search_editing_keeps_shortcuts_as_text_and_cancels_cleanly(self):
+        desk = self.desk()
+        desk.searching = True
+        desk.search_before = 'eks'
+        for character in 'query backoff':
+            desk.search_key(ord(character))
+        self.assertTrue(desk.running)
+        self.assertEqual(desk.queries['missions'], 'query backoff')
+        desk.search_key(27)
+        self.assertFalse(desk.searching)
+        self.assertEqual(desk.queries['missions'], 'eks')
+        desk.searching = True
+        desk.search_key(21)
+        desk.search_key(ord('0'))
+        desk.search_key(ord('7'))
+        desk.search_key(10)
+        self.assertEqual(desk.choices()[0][1][1]['alias'], '07')
+
+    def test_roots_and_prerequisites_target_the_registered_workspace(self):
+        desk = self.desk()
+        desk.push('mission', tui.lab_manager.find_recipe(desk.recipes, '13'))
+        self.assertEqual(desk.session().describe()['root'], 'workload')
+        desk.push('roots', desk.selected)
+        desk.index = 1
+        desk.activate()
+        self.assertEqual(desk.view, 'mission')
+        self.assertEqual(desk.session().describe()['root'], 'access')
+        desk.index = next(i for i, (_, (action, value)) in enumerate(desk.choices())
+                          if action == 'prerequisite' and value['alias'] == '07')
+        desk.activate()
+        self.assertEqual(desk.selected['alias'], '07')
+        self.assertEqual(desk.session().describe()['root'], '.')
+        desk.back()
+        self.assertEqual(desk.session().describe()['root'], 'access')
+
+    def test_apply_binds_explicit_approval_to_displayed_plan(self):
+        session = Mock()
+        plan = {'digest': 'reviewed-digest', 'approval': 'APPLY 123456789012',
+                'stale': False, 'consumed': False, 'reviewText': 'Create two owned resources.',
+                'scope': 'Metadata only; inspect values in the terminal.'}
+        session.describe.return_value = {'plan': plan}
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            tui.apply_session(session, input_fn=lambda _: 'APPLY 123456789012')
+        session.perform.assert_called_once_with('apply', approval='APPLY 123456789012',
+                                                plan_digest='reviewed-digest')
+        self.assertIn('Create two owned resources.', output.getvalue())
+        for invalid in (None, {**plan, 'stale': True}, {**plan, 'consumed': True}):
+            session.reset_mock()
+            session.describe.return_value = {'plan': invalid}
+            with self.assertRaises(ValueError):
+                tui.apply_session(session, input_fn=Mock(side_effect=AssertionError('must not prompt')))
+            session.perform.assert_not_called()
+
+    def test_repair_costs_and_inventory_keep_the_shared_result_meaning(self):
+        repair = {'status': 'unknown', 'stale': True, 'generatedAt': '2026-10-04T12:00:00Z',
+                  'phase': 'verify', 'scope': 'HTTP remains unchecked.',
+                  'checks': [{'label': 'HTTP request', 'status': 'unknown',
+                              'expected': 'Returns 200', 'observed': 'Not observed'}]}
+        text = '\n'.join(tui.repair_lines({'repair': repair}))
+        for token in ('STALE', 'UNKNOWN', 'HTTP remains unchecked.', 'Not observed'):
+            self.assertIn(token, text)
+        self.assertIn('No repair', '\n'.join(tui.repair_lines({'repair': None})))
+        inventory = {'absence': 'unknown', 'stateStatus': 'empty',
+                     'scope': 'Empty state is not verified cloud absence.',
+                     'resources': [{'address': 'aws_thing.demo', 'root': '.', 'type': 'aws_thing',
+                                    'id': 'owned-id', 'arn': 'arn:aws:example:owned'}]}
+        text = '\n'.join(tui.inventory_lines({'inventory': inventory, 'lastOperation':
+                                            {'operation': 'apply', 'status': 'failed', 'finishedAt': 'now'}}))
+        for token in ('owned-id', 'arn:aws:example:owned', 'unknown', 'failed', inventory['scope']):
+            self.assertIn(token, text)
+        costs = tui.Session(ROOT, '13').describe()['costs']
+        text = '\n'.join(tui.cost_lines(costs))
+        self.assertIn(f"${costs['oneHourUsd']:.3f}", text)
+        self.assertIn(f"${costs['twoHoursUsd']:.3f}", text)
+        self.assertIn(costs['notice'], text)
+
+    def test_configure_and_cleanup_use_shared_session_operations(self):
+        session = Mock()
+        session.runtime.workload = True
+        session.describe.return_value = {'alias': '13', 'root': 'access', 'configuration':
+                                         {'profile': 'sandbox', 'account_id': '123456789012',
+                                          'region': 'us-west-2', 'allowed_cidr': '203.0.113.4/32'}}
+        with contextlib.redirect_stdout(io.StringIO()):
+            tui.configure_session(session, input_fn=lambda _: '')
+        session.perform.assert_called_once_with('configure', profile='sandbox', account_id='123456789012',
+                                                region='us-west-2', allowed_cidr='203.0.113.4/32')
+        desk = self.desk()
+        desk.push('mission', tui.lab_manager.find_recipe(desk.recipes, '13'))
+        facade = tui.Session(ROOT, '13')
+        with patch.object(desk, 'session', return_value=facade), \
+             patch.object(facade, 'perform') as perform, \
+             patch.object(tui, 'run_external', side_effect=lambda screen, operation: operation()):
+            desk.index = next(i for i, (_, (action, _)) in enumerate(desk.choices()) if action == 'plan_destroy')
+            desk.activate()
+        perform.assert_called_once_with('plan_destroy')
+
+    def test_ordered_runbook_keeps_commands_and_cleanup_for_manual_missions(self):
+        for alias in ('02', '06', '12', '13'):
+            details = tui.Session(ROOT, alias).describe()
+            lines = '\n'.join(tui.runbook_lines(details))
+            self.assertIn('Cleanup order', lines)
+            for step in details['runbookSteps'] + details['runbookCleanup']:
+                self.assertIn(step['title'], lines)
+                self.assertIn(step['command'], lines)
+            self.assertIn(Path(details['runbook']).read_text().strip(), lines)
+
     def test_non_tty_returns_actionable_help_without_waiting(self):
         output = io.StringIO()
         with patch('sys.stdin.isatty', return_value=False), contextlib.redirect_stdout(output):
@@ -143,6 +272,60 @@ print('NORMAL TERMINAL RESTORED')
         os.write(master,b'q')
         process.wait(timeout=4)
         self.assertEqual(process.returncode,0,bytes(chunks[-2000:]))
+
+    def test_actual_pty_search_cloud_roots_evidence_cleanup_and_empty_results(self):
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 32, 120, 0, 0))
+        env = {**os.environ, 'TERM': 'xterm-256color', 'PYTHONDONTWRITEBYTECODE': '1'}
+        process = subprocess.Popen([sys.executable, str(ROOT / 'scripts/arcade_tui.py')],
+                                   stdin=slave, stdout=slave, stderr=slave, env=env,
+                                   cwd='/tmp', start_new_session=True)
+        chunks = bytearray()
+        def until(text):
+            start = len(chunks)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if select.select([master], [], [], 0.1)[0]:
+                    chunks.extend(os.read(master, 65536))
+                    if text.encode() in chunks[start:]:
+                        return
+                if process.poll() is not None:
+                    break
+            self.fail(f'Missing PTY text {text!r}: {bytes(chunks[-5000:])!r}')
+        try:
+            until('Practice desk')
+            os.write(master, b'/ImagePullBackOff\r')
+            until('11-01')
+            os.write(master, b'/\x15public path\r\r')
+            until('Game 13')
+            self.assertIn(b'1 hour', chunks)
+            self.assertIn(b'2 hours', chunks)
+            os.write(master, b'\x1bOB\x1bOB\r')
+            until('Select Terraform root')
+            os.write(master, b'\x1bOB\r')
+            until('Root: access')
+            os.write(master, b'r')
+            until('Repair evidence / Game 13 / access')
+            os.write(master, b'bi')
+            until('Resource inventory / last operation')
+            os.write(master, b'bc')
+            until('Cleanup order and commands')
+            fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 18, 60, 0, 0))
+            os.kill(process.pid, signal.SIGWINCH)
+            until('Lines ')
+            os.write(master, b'bb/\x15no-such-mission\r')
+            until('No matches.')
+            os.write(master, b'/\x15\r')
+            until('Terraform contract clinic')
+            os.write(master, b'q')
+            process.wait(timeout=4)
+            self.assertEqual(process.returncode, 0)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            os.close(master)
+            os.close(slave)
 
 
 if __name__=='__main__': unittest.main()
