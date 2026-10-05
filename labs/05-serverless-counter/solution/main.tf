@@ -33,14 +33,15 @@ data "archive_file" "code" {
   source_file = "${path.module}/handler.py"
   output_path = "${path.module}/lambda.zip"
 }
+# Leave headroom for SDK startup after repairing the environment-key fault.
 resource "aws_lambda_function" "counter" {
   function_name    = "${var.lab_id}-05-counter"
   role             = aws_iam_role.lambda.arn
   handler          = "handler.lambda_handler"
   runtime          = "python3.14"
   architectures    = ["x86_64"]
-  timeout          = 5
-  memory_size      = 128
+  timeout          = 15
+  memory_size      = 256
   filename         = data.archive_file.code.output_path
   source_code_hash = data.archive_file.code.output_base64sha256
   environment { variables = { (var.table_environment_key) = aws_dynamodb_table.counter.name } }

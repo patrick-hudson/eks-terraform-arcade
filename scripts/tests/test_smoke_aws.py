@@ -22,7 +22,7 @@ def plan_fixture(lab_id, mode="create"):
         "aws_cloudwatch_log_group.counter": {"name": f"/aws/lambda/{lab_id}-05-counter", "retention_in_days": 1},
         "aws_iam_role.lambda": {"name": f"{lab_id}-05-lambda"},
         "aws_iam_role_policy.lambda": {"name": f"{lab_id}-05-policy", "role": f"{lab_id}-05-lambda"},
-        "aws_lambda_function.counter": {"function_name": f"{lab_id}-05-counter", "memory_size": 128, "timeout": 5, "environment": [{"variables": {"COUNTER_TABLE": f"{lab_id}-05-counter"}}]},
+        "aws_lambda_function.counter": {"function_name": f"{lab_id}-05-counter", "memory_size": 256, "timeout": 15, "environment": [{"variables": {"COUNTER_TABLE": f"{lab_id}-05-counter"}}]},
     }
     changes = []
     for address, after in names.items():
@@ -89,6 +89,8 @@ class FakeRunner:
             elif "get-item" in args:
                 key = json.loads(args[args.index("--key") + 1])["pk"]["S"]
                 result = {"Item": {"pk": {"S": key}, "visits": {"N": str(self.visits)}}} if key == "smoke" or self.invalid_write else {}
+                if not result:
+                    return subprocess.CompletedProcess(args, 0, "", "")
             elif "describe-log-groups" in args:
                 result = {"logGroups": [{"logGroupName": f"/aws/lambda/{lab}-05-counter"}]} if self.resources else {"logGroups": []}
             elif any(name in args for name in ("get-function", "describe-table", "get-role")):
@@ -185,6 +187,31 @@ class SmokeTests(unittest.TestCase):
                 plan["resource_changes"][index]["change"]["before"][key] = "somebody-elses-resource"
                 with self.assertRaises(smoke.SmokeError):
                     smoke.validate_plan(plan, self.path.name, "destroy")
+
+    def test_lambda_startup_headroom_requires_exact_reviewed_limits(self):
+        for mode in ("create", "repair", "verify"):
+            with self.subTest(mode=mode):
+                plan = plan_fixture(self.path.name, mode)
+                self.assertEqual(len(smoke.validate_plan(plan, self.path.name, mode)), 5)
+                for memory, timeout in ((128, 15), (256, 5), (512, 15), (256, 30)):
+                    with self.subTest(memory=memory, timeout=timeout):
+                        changed = plan_fixture(self.path.name, mode)
+                        function = next(resource for resource in changed["resource_changes"] if resource["address"] == "aws_lambda_function.counter")
+                        function["change"]["after"].update(memory_size=memory, timeout=timeout)
+                        with self.assertRaises(smoke.SmokeError):
+                            smoke.validate_plan(changed, self.path.name, mode)
+
+    def test_successful_missing_item_cli_output_is_an_empty_item_result(self):
+        for output in ("", " \n", "{}", '{"Item":{"visits":{"N":"2"}}}'):
+            with self.subTest(output=output):
+                response = subprocess.CompletedProcess([], 0, output, "")
+                with patch.object(self.run, "aws", return_value=response):
+                    self.assertEqual(self.run.stored_item("smoke"), json.loads(output) if output.strip() else {})
+
+    def test_malformed_item_output_is_not_treated_as_absence(self):
+        with patch.object(self.run, "aws", return_value=subprocess.CompletedProcess([], 0, "not-json", "")):
+            with self.assertRaises(json.JSONDecodeError):
+                self.run.stored_item("smoke")
 
     def test_happy_path_proves_fault_repair_counter_and_named_absence(self):
         self.run.execute(self.run.plan())
