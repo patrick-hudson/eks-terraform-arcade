@@ -16,7 +16,7 @@ variable "allowed_cidr" {
 }
 variable "kubernetes_version" {
   type    = string
-  default = "1.36"
+  default = "1.37"
 }
 
 data "aws_availability_zones" "available" {

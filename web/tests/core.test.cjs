@@ -17,7 +17,7 @@ test('relative Markdown paths resolve across labs, without escaping the kit', ()
 
 test('corrupt progress is recoverable and completion requires all checkpoints', () => {
   assert.deepEqual(core.readProgress('{broken').labs, {});
-  assert.equal(core.readProgress('{"schemaVersion":1,"labs":[]}').schemaVersion, 2);
+  assert.equal(core.readProgress('{"schemaVersion":1,"labs":[]}').schemaVersion, 3);
   const value = core.readProgress(JSON.stringify({ schemaVersion: 1, labs: { a: {status:'done', checks:{cleanup:false}, notes:'my notes'}, b:{status:'done', checks:{reproduce:true,diagnose:true,verify:true,cleanup:true}} } }));
   assert.equal(value.labs.a.status, 'active');
   assert.equal(value.labs.a.notes, 'my notes');
@@ -30,4 +30,8 @@ test('search and track filters use public metadata, never answers', () => {
   assert.equal(core.filterLabs(labs, 'iam', 'AWS').length,1);
   assert.equal(core.filterLabs(labs, 'secret', 'All').length,0);
   assert.equal(core.filterLabs(labs, '', 'Terraform').length,1);
+});
+
+test('environment session links retain their route after reload',()=>{
+  assert.equal(core.parseRoute(core.labRoute('00-terraform-contracts','session')).tab,'session');
 });

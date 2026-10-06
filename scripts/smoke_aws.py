@@ -128,7 +128,7 @@ def validate_plan(plan, lab_id, mode):
             raise SmokeError("Log retention must be one day.")
         if address.startswith("aws_lambda"):
             key = "COUNTER_TABLE" if mode == "create" else "TABLE_NAME"
-            if after.get("memory_size") != 128 or after.get("timeout") != 5 or after.get("environment") != [{"variables": {key: f"{lab_id}-05-counter"}}]:
+            if after.get("memory_size") != 256 or after.get("timeout") != 15 or after.get("environment") != [{"variables": {key: f"{lab_id}-05-counter"}}]:
                 raise SmokeError("Lambda size, timeout, or environment exceeds the reviewed recipe.")
             if mode == "repair":
                 before = change.get("before") or {}
@@ -264,7 +264,9 @@ class SmokeRun:
         return result, payload
 
     def stored_item(self, counter):
-        return json.loads(self.aws("dynamodb", "get-item", "--table-name", f"{self.path.name}-05-counter", "--key", json.dumps({"pk": {"S": counter}}), "--consistent-read").stdout)
+        result = self.aws("dynamodb", "get-item", "--table-name", f"{self.path.name}-05-counter", "--key", json.dumps({"pk": {"S": counter}}), "--consistent-read")
+        # The CLI can return empty stdout when the requested item does not exist.
+        return json.loads(result.stdout.strip() or "{}")
 
     def stored_visits(self):
         return int(self.stored_item("smoke")["Item"]["visits"]["N"])

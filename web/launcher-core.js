@@ -10,6 +10,8 @@
     const alias=value.id.includes('/scenario-')?`${value.id.slice(0,2)}-${value.id.slice(-2)}`:value.id.slice(0,2);
     if(value.alias!==alias || !['terraform','kubernetes','runbook'].includes(value.kind) || !text(value.title,200) || !text(value.cost,1000)) invalid();
     if(!Array.isArray(value.prerequisites) || value.prerequisites.length>20 || value.prerequisites.some(id=>!text(id,100)||!identifier.test(id))) invalid();
+    const dependencies=value.environmentPrerequisites||value.prerequisites;
+    if(!Array.isArray(dependencies)||dependencies.length>20||dependencies.some(id=>!text(id,100)||!identifier.test(id)))invalid();
     if(!value.modes || typeof value.modes!=='object' || Array.isArray(value.modes)) invalid();
     const modes={};
     for(const [key,mode] of Object.entries(value.modes)) {
@@ -19,7 +21,7 @@
     if(value.kind==='runbook') {
       if(value.runDirectory!==null || Object.keys(modes).length) invalid();
     } else if(!text(value.runDirectory,200) || !relativePath.test(value.runDirectory) || !Object.keys(modes).length) invalid();
-    return {id:value.id,alias,title:value.title,kind:value.kind,runDirectory:value.runDirectory,prerequisites:[...value.prerequisites],cost:value.cost,modes};
+    return {id:value.id,alias,title:value.title,kind:value.kind,runDirectory:value.runDirectory,prerequisites:[...value.prerequisites],environmentPrerequisites:[...dependencies],cost:value.cost,modes};
   }
   function defaultMode(recipe) {return recipe.modes.starter?'starter':Object.keys(recipe.modes)[0]||null;}
   function commands(recipe,mode=defaultMode(recipe)) {

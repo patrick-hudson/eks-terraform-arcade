@@ -158,6 +158,35 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("runbook", output.lower())
         self.assertFalse((self.root / "run").exists())
 
+    def test_start_and_next_show_prerequisite_setup_order_and_commands(self):
+        foundation = json.loads(json.dumps(self.recipe))
+        foundation.update(id="07-foundation", alias="07", title="Cluster foundation", runDirectory="foundation")
+        workload = json.loads(json.dumps(self.recipe))
+        workload.update(id="08-workload", alias="08", title="Cluster workload", runDirectory="workload",
+                        prerequisites=[foundation["id"]])
+        self.recipe["prerequisites"] = [workload["id"], foundation["id"]]
+        self.write_catalog([self.recipe, workload, foundation])
+        for command in ("start", "next"):
+            code, output = self.run_cli(command, "05")
+            self.assertEqual(code, 0, output)
+            self.assertIn("Prerequisite Terraform setup order", output)
+            self.assertLess(output.index("1. 07"), output.index("2. 08"))
+            self.assertEqual(output.count("start 07"), 1)
+            self.assertIn("start 08", output)
+            self.assertIn("not verified live readiness", output)
+            self.assertFalse((self.root / "run/foundation").exists())
+            self.assertFalse((self.root / "run/workload").exists())
+
+    def test_runbook_shows_environment_dependency_before_handoff(self):
+        book = {**self.recipe, "id": "12-capstone", "alias": "12", "title": "Capstone",
+                "kind": "runbook", "runDirectory": None, "modes": {}, "prerequisites": [self.recipe["id"]]}
+        self.write_catalog([book, self.recipe])
+        code, output = self.run_cli("start", "12")
+        self.assertEqual(code, 0, output)
+        self.assertIn("start 05", output)
+        self.assertIn("not verified live readiness", output)
+        self.assertFalse((self.root / "run").exists())
+
     def test_status_counts_managed_instances_only_and_never_prints_attributes(self):
         dest = self.prepare()
         (dest / "terraform.tfstate").write_text(json.dumps({"version": 4, "resources": [
@@ -243,3 +272,16 @@ class LauncherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class EnvironmentPrerequisiteTests(unittest.TestCase):
+    def test_curriculum_prerequisites_are_not_running_dependencies(self):
+        recipes = manager.load_recipes(Path(__file__).resolve().parents[2])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '02')), [])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '12')), ['07-eks-foundation'])
+        self.assertEqual(manager.environment_prerequisites(manager.find_recipe(recipes, '13')), ['07-eks-foundation'])
+
+    def test_public_launch_uses_environment_dependencies(self):
+        from web.launch import public_recipe
+        root = Path(__file__).resolve().parents[2]
+        self.assertEqual(public_recipe(root, '02-remote-state')['environmentPrerequisites'], [])
+        self.assertEqual(public_recipe(root, '12-capstone')['environmentPrerequisites'], ['07-eks-foundation'])

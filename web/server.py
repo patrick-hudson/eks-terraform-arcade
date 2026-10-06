@@ -1,24 +1,39 @@
 #!/usr/bin/env python3
-"""Read-only loopback learning UI. Run: python3 web/server.py --port 8765."""
+"""Loopback learning UI with an explicitly enabled local session runner."""
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import hmac
 from pathlib import Path
 import re
+import sys
 from urllib.parse import parse_qs, urlsplit
 
 if __package__:
     from .catalog import Catalog, FileNotAllowed, read_regular_file
     from .learning import LearningCatalog
+    from .session import JobCoordinator, Busy
     from .launch import public_recipe
 else:
     from catalog import Catalog, FileNotAllowed, read_regular_file
     from learning import LearningCatalog
+    from session import JobCoordinator, Busy
     from launch import public_recipe
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from scripts import drill_engine
+
 ASSETS = {
+    "/session.js": ("session.js", "text/javascript; charset=utf-8"),
+    "/session.css": ("session.css", "text/css; charset=utf-8"),
+    "/theme.js": ("theme.js", "text/javascript; charset=utf-8"),
+    "/theme.css": ("theme.css", "text/css; charset=utf-8"),
+    "/drills.js": ("drills.js", "text/javascript; charset=utf-8"),
+    "/drills-core.js": ("drills-core.js", "text/javascript; charset=utf-8"),
+    "/drills.css": ("drills.css", "text/css; charset=utf-8"),
     "/launcher-core.js": ("launcher-core.js", "text/javascript; charset=utf-8"),
     "/launcher.js": ("launcher.js", "text/javascript; charset=utf-8"),
     "/verification-core.js": ("verification-core.js", "text/javascript; charset=utf-8"),
@@ -116,7 +131,23 @@ class ArcadeHandler(BaseHTTPRequestHandler):
             if request.scheme or request.netloc or request.fragment:
                 self._error(400, "Use a local request path")
                 return
-            if request.path == "/api/catalog":
+            if request.path == "/api/session":
+                raw = parse_qs(request.query, keep_blank_values=True)
+                expected = {"id", "root"} if "root" in raw else {"id"}
+                query = self._query(request.query, expected)
+                root = query.get("root")
+                if root is not None and root not in {".", "access", "workload"}:
+                    raise ValueError("Invalid Terraform root")
+                session = self.server.sessions.describe(query["id"], root)
+                self._send(200, json.dumps({"session":session,
+                    "runnerEnabled":self.server.sessions.enabled,
+                    "token":self.server.sessions.token,
+                    "job":self.server.sessions.latest(query["id"]),
+                    "activeJob":self.server.sessions.active()}, ensure_ascii=False))
+            elif request.path == "/api/session/job":
+                query = self._query(request.query, {"id"})
+                self._send(200, json.dumps(self.server.sessions.get(query["id"]), ensure_ascii=False))
+            elif request.path == "/api/catalog":
                 if request.query:
                     self._error(400, "Catalog takes no query parameters")
                     return
@@ -127,6 +158,19 @@ class ArcadeHandler(BaseHTTPRequestHandler):
             elif request.path == "/api/lesson":
                 query = self._query(request.query, {"id"})
                 self._send(200, json.dumps(self.server.learning.public_lesson(query["id"]), ensure_ascii=False))
+            elif request.path == "/api/drills":
+                if request.query:
+                    raise ValueError("Drill catalog takes no query parameters")
+                self._send(200, json.dumps(drill_engine.list_drills(root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill":
+                query = self._query(request.query, {"id"})
+                self._send(200, json.dumps(drill_engine.public_drill(query["id"], root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill-evidence":
+                query = self._query(request.query, {"id", "evidence"})
+                self._send(200, json.dumps(drill_engine.evidence(query["id"], query["evidence"], root=self.server.root), ensure_ascii=False))
+            elif request.path == "/api/drill-answer":
+                query = self._query(request.query, {"id", "answer"})
+                self._send(200, json.dumps(drill_engine.answer(query["id"], query["answer"], root=self.server.root), ensure_ascii=False))
             elif request.path == "/api/launch":
                 query = self._query(request.query, {"id"})
                 self._send(200, json.dumps(public_recipe(self.server.root, query["id"]), ensure_ascii=False))
@@ -150,7 +194,7 @@ class ArcadeHandler(BaseHTTPRequestHandler):
                 self._error(404, "Not found")
         except FileNotAllowed:
             self._error(404, "Source is unavailable or not allowed")
-        except (ValueError, UnicodeError):
+        except (ValueError, UnicodeError, RuntimeError):
             self._error(400, "Invalid request")
 
     do_HEAD = do_GET
@@ -162,10 +206,46 @@ class ArcadeHandler(BaseHTTPRequestHandler):
             self._error(405, "This server is read-only", allow=True)
         self.close_connection = True
 
-    do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _read_only
+    def do_POST(self):
+        if not self._request_allowed():
+            self._error(403, "Only requests from this local UI are allowed")
+            self.close_connection = True
+            return
+        if not self.server.sessions.enabled:
+            self._read_only()
+            return
+        origin = self.headers.get("Origin", "")
+        token = self.headers.get_all("X-Arcade-Token", [])
+        if not origin or len(token) != 1 or not hmac.compare_digest(token[0], self.server.sessions.token):
+            self._error(403, "Reload the local runner to obtain its session capability")
+            self.close_connection = True
+            return
+        if self.path != "/api/session/operation":
+            self._error(404, "Not found")
+            self.close_connection = True
+            return
+        try:
+            lengths = self.headers.get_all("Content-Length", [])
+            if len(lengths) != 1 or not lengths[0].isdigit() or self.headers.get("Transfer-Encoding"):
+                raise ValueError("Supply one bounded JSON body")
+            length = int(lengths[0])
+            if not 1 <= length <= 8192 or self.headers.get("Content-Type") != "application/json":
+                raise ValueError("Supply a JSON body under 8 KiB")
+            self.connection.settimeout(10)
+            payload = json.loads(self.rfile.read(length))
+            job = self.server.sessions.start(payload)
+            self._send(202, json.dumps(job, ensure_ascii=False))
+        except Busy as error:
+            self._error(409, str(error))
+        except (ValueError, UnicodeError, RuntimeError, OSError):
+            self._error(400, "Invalid session operation; choose a catalog mission and its supported inputs")
+        finally:
+            self.close_connection = True
+
+    do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _read_only
 
 
-def create_server(root=PROJECT_ROOT, host="127.0.0.1", port=8765):
+def create_server(root=PROJECT_ROOT, host="127.0.0.1", port=8765, *, runner=False, session_factory=None):
     if host not in {"127.0.0.1", "localhost"}:
         raise ValueError("The learning UI must bind to localhost or 127.0.0.1")
     root = Path(root).resolve()
@@ -176,22 +256,24 @@ def create_server(root=PROJECT_ROOT, host="127.0.0.1", port=8765):
     server.root = root
     server.catalog = catalog
     server.learning = learning
+    server.sessions = JobCoordinator(root, enabled=runner, factory=session_factory)
     return server
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Serve the learning kit locally without executing any lab commands.")
+    parser = argparse.ArgumentParser(description="Serve the learning kit locally; opt in to Terraform session operations with --runner.")
+    parser.add_argument("--runner", action="store_true", help="Enable explicitly approved local Terraform session operations")
     parser.add_argument("--host", choices=("127.0.0.1", "localhost"), default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     options = parser.parse_args()
     if not 1 <= options.port <= 65535:
         parser.error("--port must be between 1 and 65535")
     try:
-        server = create_server(host=options.host, port=options.port)
+        server = create_server(host=options.host, port=options.port, runner=options.runner)
     except (OSError, FileNotAllowed) as error:
         parser.error(f"Cannot start the local server: {error}")
     print(f"AWS Interview Arcade: http://{options.host}:{server.server_port}", flush=True)
-    print("Read-only source viewer. Run lab commands yourself; Ctrl-C stops this server.", flush=True)
+    print("Local runner enabled. Review and approve each saved plan; active jobs finish if the tab closes." if options.runner else "Read-only source viewer. Use --runner to enable session operations.", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

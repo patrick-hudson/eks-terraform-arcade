@@ -1,5 +1,7 @@
 # Keep the practice below your $20 allowance
 
+For a detailed teardown audit, also capture service-created children before deleting their parents. The [EKS launch-template inventory lesson](solutions/workflow-issues/eks-managed-launch-template-inventory.md) explains one child that Terraform state alone can miss.
+
 **Target expected spend: under $5. Personal allowance: $20 total.** Eight total billable EKS hours, one worker normally and two briefly, small datasets, and prompt deletion leave a substantial buffer. This is an estimate, not an AWS spending cap. Count provisioning, troubleshooting and deletion time too. Rates below use **US West (Oregon), `us-west-2`**, checked against AWS’s public regional price lists on October 4, 2026, before tax and without free-tier credits.
 
 | Component | Planning rate | Kit default |
@@ -53,6 +55,18 @@ If the name already exists, inspect the existing budget instead of creating dupl
 ```bash
 aws budgets delete-budget --account-id "$TF_VAR_expected_account_id" --budget-name "$LAB_BUDGET_NAME"
 ```
+
+## Estimates and inventory in the session controls
+
+The browser’s **Environment** tab and the TUI show the same dated **1-hour and 2-hour estimates** as `./arcade session status ID`. Open the assumptions to distinguish the selected mission’s extra cost from its shared Game 07 foundation. The default foundation estimate is **$0.1488/hour**, approximately **$0.15 for one hour** or **$0.30 for two hours**. Count that shared foundation once across simultaneous exercises, not once for every mission. A displayed $0 base for a usage-based service does not mean its requests, storage, logs or transfer are free.
+
+The estimates are authored planning assumptions, not live billing data or a hard spending cap. They do not start or stop with the practice timer. Provisioning, failed attempts and deletion all take billable time; only verified resource cleanup establishes the end of that exposure.
+
+Use **Plan cleanup** in the browser or **Plan destroy** in the TUI, review the separate saved plan and type its `DESTROY` approval. CLI equivalents are `./arcade session plan_destroy ID` followed by `./arcade session apply ID`; include the same `--root` for multi-root missions. Deletion follows reverse dependency order. Games 09/10 remove `workload` before infrastructure (`.`); Game 13 removes `access` before `workload`; all precede Game 07.
+
+The session retains observed Terraform addresses, types, IDs and ARNs and the last operation result across failures and destruction. It does not expose full state, credentials or arbitrary resource attributes. Use **Resource inventory** in the browser, **i** from a TUI mission, or the CLI status JSON to recover those identifiers. Keep additional IDs for resources created by controllers or outside Terraform, such as a backing EBS volume.
+
+A repair receipt after destruction may include bounded cleanup observations. The retained inventory’s **Cloud absence: unknown** field still means it does not certify absence. Empty state, an absent workspace or a failed API call cannot establish deletion. Preserve state and inputs after a failed cleanup and perform the named-resource checks below and in the mission runbook.
 
 ## Session ledger
 

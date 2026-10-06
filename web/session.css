@@ -1,0 +1,64 @@
+.cloud-session {max-width:1040px;padding:26px 0;}
+.session-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:22px;}
+.session-heading h2 {font-size:32px;letter-spacing:-1px;line-height:1.2;margin:10px 0;}
+.session-heading p:not(.eyebrow) {color:var(--muted);font-size:13px;line-height:1.8;max-width:630px;}
+.session-state {font:11px/1.5 var(--font-mono);border:1px solid var(--line-strong);color:var(--mint-ink);background:var(--mint);padding:7px 12px;border-radius:24px;white-space:nowrap;}
+.session-summary {display:grid;grid-template-columns:2fr 1fr 1fr;gap:20px;margin:24px 0 12px;padding:24px;background:var(--paper);border:1px solid var(--line);border-radius:13px;}
+.session-summary div {border-right:1px solid var(--line);padding-right:14px;min-width:0;}
+.session-summary div:last-child {border:0;}
+.session-summary span {display:block;color:var(--muted);font:10px var(--font-mono);margin-bottom:10px;}
+.session-summary strong {font-size:20px;letter-spacing:-.4px;line-height:1.4;}
+.session-summary div:first-child strong {font-size:17px;text-transform:capitalize;}
+.session-assumptions {font-size:12px;color:var(--muted);padding:5px 0 14px;line-height:1.8;}
+.session-assumptions summary {cursor:pointer;color:var(--muted);}
+.session-prerequisites {background:var(--surface-soft);border-left:3px solid var(--accent);padding:17px 22px;border-radius:0 10px 10px 0;margin:20px 0;}
+.session-prerequisites h3 {margin:0 0 13px;font-size:16px;}
+.session-prerequisites ul {padding:0;list-style:none;margin:0;}
+.session-prerequisites li {font-size:12px;padding:7px 0;}
+.session-prerequisites a {color:var(--accent);font-weight:600;}
+.session-prerequisites span {display:block;color:var(--muted);font-size:11px;margin-top:5px;}
+.session-toolbar {display:flex;flex-wrap:wrap;align-items:center;gap:15px;font-size:11px;padding:15px 0;}
+.session-toolbar>span {color:var(--muted);overflow-wrap:anywhere;font:10px var(--font-mono);}
+.session-toolbar label,.session-actions label {display:flex;align-items:center;gap:9px;color:var(--muted);font-size:11px;}
+.cloud-session select {min-height:36px;padding:7px;border:1px solid var(--line-strong);border-radius:6px;}
+.session-actions {display:flex;flex-wrap:wrap;gap:10px;padding:20px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.session-actions label {flex-basis:100%;margin-bottom:5px;}
+.session-enable {margin:20px 0;padding:23px;background:var(--surface-soft);border:1px solid var(--line-strong);border-radius:12px;}
+.session-enable h3 {font-size:17px;margin:0 0 12px;}
+.session-enable p {font-size:13px;line-height:1.8;color:var(--muted);margin:8px 0;}
+.session-config {padding:20px 0;}
+.session-config summary,.session-runbook summary,.session-inventory summary {font-size:13px;font-weight:600;cursor:pointer;}
+.session-config p {font-size:12px;color:var(--muted);line-height:1.7;}
+.session-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0;}
+.session-fields label,[data-approval-form] label {display:grid;gap:8px;font-size:12px;color:var(--muted);}
+.cloud-session input {width:100%;min-width:0;border:1px solid var(--line-strong);border-radius:6px;min-height:40px;padding:9px 12px;font:12px/1.5 var(--font-mono);}
+.session-plan,.session-job,.session-repair {padding:24px;border:1px solid var(--line-strong);border-radius:12px;margin:24px 0;background:var(--paper);}
+.cloud-session .section-heading h3 {margin:0;font-size:19px;}
+.cloud-session .section-heading>span {font:10px/1.5 var(--font-mono);color:var(--muted);}
+.session-plan p,.session-repair p {font-size:12px;color:var(--muted);line-height:1.8;}
+.cloud-session pre {background:var(--code);color:var(--code-ink);padding:20px;border-radius:8px;font:11px/1.9 var(--font-mono);overflow:auto;max-height:450px;}
+[data-approval-form] {display:flex;align-items:end;gap:15px;flex-wrap:wrap;margin-top:23px;}
+[data-approval-form] label {flex:1;min-width:210px;}
+[data-approval-form] strong {color:var(--ink);font:13px var(--font-mono);}
+.session-job ol {padding-left:20px;font:11px/1.9 var(--font-mono);color:var(--muted);max-height:220px;overflow:auto;}
+.cloud-session small {font-size:11px;color:var(--muted);line-height:1.7;}
+.session-warning {color:var(--warning)!important;background:var(--warning-surface);padding:12px 15px;border-radius:6px;font-size:12px;overflow-wrap:anywhere;}
+.session-repair details {padding:14px 0;border-top:1px solid var(--line);font-size:12px;}
+.session-repair summary {cursor:pointer;line-height:1.6;}
+.session-repair summary span {color:var(--accent);font:10px var(--font-mono);margin-right:8px;}
+.session-evidence-state.pass {color:var(--positive)!important;}
+.session-evidence-state.fail {color:var(--negative)!important;}
+.session-evidence-state.unknown {color:var(--warning)!important;}
+.session-evidence-empty {color:var(--muted);font-size:12px;padding:20px 0;}
+.session-inventory,.session-runbook {margin:20px 0;padding:18px 0;border-top:1px solid var(--line);}
+.session-inventory p {font-size:12px;color:var(--muted);line-height:1.7;}
+.session-inventory>div {padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere;}
+.session-inventory strong {font-size:12px;}
+.session-inventory code {display:block;color:var(--muted);font-size:11px;margin-top:5px;}
+.session-cleanup {border:1px solid var(--line);padding:23px;border-radius:12px;background:var(--surface-soft);}
+.session-cleanup h3 {margin:0 0 12px;font-size:17px;}
+.session-cleanup p,.session-cleanup li {font-size:12px;color:var(--muted);line-height:1.8;}
+.session-runbook h4 {font-size:13px;}
+@media(max-width:700px){.session-heading{flex-direction:column;gap:8px;}.session-heading h2{font-size:28px;}.session-summary{grid-template-columns:1fr 1fr;padding:18px;gap:20px 10px;}.session-summary div:first-child{grid-column:1/-1;border:0;border-bottom:1px solid var(--line);padding-bottom:15px;}.session-fields{grid-template-columns:1fr;}.session-plan,.session-job,.session-repair{padding:18px;}.session-actions .button{flex:1 1 140px;}.session-toolbar>span{flex-basis:100%;}}
+
+.session-root-help {font-size:12px;line-height:1.8;color:var(--muted);margin:20px 0 0;}

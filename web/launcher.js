@@ -1,4 +1,4 @@
-/* A terminal handoff only. The browser never starts a process or contacts AWS. */
+/* Copyable terminal workflow; the Environment tab owns opt-in session controls. */
 (() => {
   'use strict';
   const L=window.ArcadeLauncherCore, C=window.ArcadeCore;
@@ -20,7 +20,7 @@
       const recipe=await load(labId);
       if(!target.isConnected)return;
       let mode=selections.get(labId)||L.defaultMode(recipe);
-      const prerequisites=()=>recipe.prerequisites.length?`<div class="launch-prerequisites"><span>Prepare first</span>${recipe.prerequisites.map(id=>`<a href="${C.labRoute(id)}">Lab ${esc(id.slice(0,2))} ${icon('arrow')}</a>`).join('')}</div>`:'';
+      const prerequisites=()=>recipe.environmentPrerequisites.length?`<div class="launch-prerequisites"><span>Prepare first</span>${recipe.environmentPrerequisites.map(id=>`<a href="${C.labRoute(id)}">Lab ${esc(id.slice(0,2))} ${icon('arrow')}</a>`).join('')}</div>`:'';
       function render() {
         if(!target.isConnected)return;
         const runbook=recipe.kind==='runbook', command=L.commands(recipe,mode);
@@ -32,7 +32,7 @@
         <div class="launch-preservation"><strong>Already started?</strong><p>Run the same command to resume. Your edits and Terraform state stay in place. The launcher refuses to switch modes or replace an existing unregistered directory.</p></div>`}
         <div class="launch-cost"><span>SESSION COST</span><p>${esc(recipe.cost)}</p></div>
         <div class="launch-links"><a class="inline-link" href="#/guide/lab-launcher">Launcher guide ${icon('arrow')}</a><a class="inline-link" href="${C.labRoute(labId,'brief')}">Complete runbook ${icon('arrow')}</a></div>
-        ${runbook?'':`<details class="launch-status"><summary>When you return: inspect status and clean up</summary><p>Run <code>arcade status</code> to inspect local workspaces. It cannot certify what remains in AWS. Run <code>arcade next ${recipe.alias}</code> for this lab’s commands, including cleanup, and confirm deletion with its runbook before ending the session.</p><button class="button secondary small" data-status-copy>${icon('copy')} Copy status command</button></details><p class="field-note launch-footnote">The browser does not run these commands or read your AWS credentials. If <code>arcade</code> is unavailable, follow <a href="#/guide/setup">tool and PATH setup</a> first.</p>`}</section>`;
+        ${runbook?'':`<details class="launch-status"><summary>When you return: inspect status and clean up</summary><p>Run <code>arcade status</code> to inspect local workspaces. It cannot certify what remains in AWS. Run <code>arcade next ${recipe.alias}</code> for this lab’s commands, including cleanup, and confirm deletion with its runbook before ending the session.</p><button class="button secondary small" data-status-copy>${icon('copy')} Copy status command</button></details><p class="field-note launch-footnote">These commands are for your terminal. For built-in controls, open the <a href="${C.labRoute(labId,'session')}">Environment tab</a>. If <code>arcade</code> is unavailable, follow <a href="#/guide/setup">tool and PATH setup</a> first.</p>`}</section>`;
         target.querySelectorAll('.launch-mode input').forEach(input=>input.onchange=()=>{mode=input.value;selections.set(labId,mode);render();target.querySelector(`.launch-mode input[value="${mode}"]`)?.focus();});
         target.querySelector('[data-launch-copy]')?.addEventListener('click',event=>copyText(command,event.currentTarget));
         target.querySelector('[data-status-copy]')?.addEventListener('click',event=>copyText('arcade status',event.currentTarget));

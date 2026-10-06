@@ -86,6 +86,8 @@ def load_recipes(root: Path) -> list[dict]:
             raise LauncherError(f"Unknown preparation mode: {recipe['id']}")
         if not isinstance(recipe.get("prerequisites"), list) or not all(isinstance(x, str) for x in recipe["prerequisites"]):
             raise LauncherError(f"Invalid prerequisite list: {recipe['id']}")
+        if "environmentPrerequisites" in recipe and (not isinstance(recipe["environmentPrerequisites"], list) or not all(isinstance(x, str) for x in recipe["environmentPrerequisites"])):
+            raise LauncherError(f"Invalid environment prerequisite list: {recipe['id']}")
         if recipe["kind"] == "runbook":
             if modes or recipe.get("runDirectory") is not None:
                 raise LauncherError("Runbook recipes cannot create workspaces.")
@@ -125,7 +127,7 @@ def load_recipes(root: Path) -> list[dict]:
                     raise LauncherError(f"Invalid {key} commands: {recipe['id']}")
     canonical_ids = {recipe["id"] for recipe in recipes}
     for recipe in recipes:
-        if not set(recipe["prerequisites"]) <= canonical_ids:
+        if not set(recipe["prerequisites"]) <= canonical_ids or not set(environment_prerequisites(recipe)) <= canonical_ids:
             raise LauncherError(f"Unknown prerequisite: {recipe['id']}")
     return recipes
 
@@ -214,11 +216,42 @@ def prepare(root: Path, recipe: dict, requested_mode: str | None) -> tuple[Path,
     return directory, mode, True
 
 
+def environment_prerequisites(recipe: dict) -> list[str]:
+    """Running infrastructure dependencies, distinct from prior learning."""
+    return recipe.get("environmentPrerequisites", recipe["prerequisites"])
+
+
+def print_prerequisites(root: Path, recipe: dict, recipes: list[dict]) -> None:
+    """Show dependency order without preparing or checking any environment."""
+    if recipe["alias"] == "12":
+        print("Capstone start: retain Game 07, but destroy earlier exercise workloads through their own Terraform first.")
+    ordered, seen = [], {recipe["id"]}
+
+    def visit(identifier: str) -> None:
+        if identifier in seen:
+            return
+        seen.add(identifier)
+        prerequisite = find_recipe(recipes, identifier)
+        for dependency in environment_prerequisites(prerequisite):
+            visit(dependency)
+        ordered.append(prerequisite)
+
+    for identifier in environment_prerequisites(recipe):
+        visit(identifier)
+    if not ordered:
+        print("\nPrerequisite Terraform environments: none declared.")
+        return
+    print("\nPrerequisite Terraform setup order (complete before this exercise):")
+    entry = shlex.quote(str(root / "arcade"))
+    for number, prerequisite in enumerate(ordered, 1):
+        print(f"{number}. {prerequisite['alias']} — {prerequisite['title']}")
+        print(f"   {entry} start {prerequisite['alias']}")
+    print("Prepared files are not verified live readiness. Follow each prerequisite runbook's verification before continuing.")
+
+
 def print_steps(root: Path, recipe: dict, mode: str, directory: Path) -> None:
     chosen = recipe["modes"][mode]
     print(f"\n{recipe['title']} — {chosen['label']}\n{chosen['description']}\nCost: {recipe['cost']}")
-    if recipe["prerequisites"]:
-        print("Prerequisites: " + ", ".join(recipe["prerequisites"]) + " (readiness has not been checked)")
     print("\nRun these commands yourself. Preparation executes no Terraform, kubectl or AWS commands.")
     print(f"\nsource {shlex.quote(str(root / 'scripts/env.sh'))}\ncd {shlex.quote(str(directory))}")
     for key, label in (("steps", "Next steps"), ("cleanup", "Cleanup after practice")):
@@ -330,6 +363,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
         recipes = load_recipes(root)
         if args.command == "labs":
             public = [{**{k: r[k] for k in ("id", "alias", "title", "kind", "runDirectory", "prerequisites", "cost")},
+                       "environmentPrerequisites": environment_prerequisites(r),
                        "modes": {name: {k: mode[k] for k in ("label", "description")} for name, mode in r["modes"].items()}} for r in recipes]
             if args.json:
                 print(json.dumps({"schemaVersion": 1, "recipes": public}, indent=2))
@@ -356,6 +390,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
         else:
             recipe = find_recipe(recipes, args.id)
             if recipe["kind"] == "runbook":
+                print_prerequisites(root, recipe, recipes)
                 print(f"{recipe['title']} is a runbook; no standalone workspace is prepared.\nRead: {root / 'labs' / recipe['id'] / 'README.md'}")
                 return 0
             if args.command == "start":
@@ -366,6 +401,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
                 if not directory.exists():
                     raise LauncherError(f"Lab is not prepared. Run arcade start {recipe['alias']} first.")
                 mode = session_receipt(directory, recipe)["mode"]
+            print_prerequisites(root, recipe, recipes)
             print_steps(root, recipe, mode, directory)
         return 0
     except (OSError, ValueError) as error:

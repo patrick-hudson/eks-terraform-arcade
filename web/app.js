@@ -52,7 +52,7 @@
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          if (![1,2].includes(parsed?.schemaVersion) || !parsed?.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') throw new Error('Invalid state');
+          if (![1,2,3].includes(parsed?.schemaVersion) || !parsed?.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') throw new Error('Invalid state');
         } catch { storageWarning('Saved progress could not be read. The labs still work; new changes will start a fresh record.'); }
       }
     } catch {
@@ -94,12 +94,14 @@
     const completed = doneCount();
     const guidePath = id => `#/guide/${encodeURIComponent(id)}`;
     const guideIcon = id => /cost|cleanup/i.test(id) ? 'shield' : 'book';
-    const guideLabels = {'setup':'Setup & tools','cost-and-cleanup':'Cost & cleanup','interview-scorecard':'Interview scorecard','VALIDATION':'What was verified','overview':'Course overview','web-ui':'Using this workspace','toolchain':'Current toolchain','learning-design':'How practice works','aws-testing':'Connect AWS for testing','lab-launcher':'Launch and resume labs', 'live-verification':'Check real lab results', 'glossary':'Plain-English glossary'};
+    const guideLabels = {'setup':'Setup & tools','tui':'Terminal workspace','offline-practice':'Offline practice','plan-review':'Review a Terraform plan','cost-and-cleanup':'Cost & cleanup','interview-scorecard':'Interview scorecard','VALIDATION':'What was verified','overview':'Course overview','web-ui':'Using this workspace','toolchain':'Current toolchain','learning-design':'How practice works','aws-testing':'Connect AWS for testing','lab-launcher':'Launch and resume labs', 'live-verification':'Check real lab results', 'glossary':'Plain-English glossary'};
     const guideOrder = Object.keys(guideLabels);
-    const guides = [...catalog.docs].sort((a,b) => guideOrder.indexOf(a.id) - guideOrder.indexOf(b.id));
+    const guideRank=id=>guideOrder.includes(id)?guideOrder.indexOf(id):guideOrder.length;
+    const guides = [...catalog.docs].sort((a,b) => guideRank(a.id) - guideRank(b.id));
     $('#sidebar').innerHTML = `<a class="brand" href="#/"><span class="brand-mark">${icon('terminal')}</span><span><span class="brand-name">AWS ARCADE</span><span class="brand-subtitle">INTERVIEW PRACTICE</span></span></a>
       <div class="nav-section-label">YOUR WORKSPACE</div><nav aria-label="Main navigation">
       ${navLink('#/', 'Lab directory', 'grid', route.kind === 'home', `<span class="nav-count">${catalog.labs.length}</span>`)}
+      ${navLink('#/practice', 'Practice desk', 'search', ['practice','drill'].includes(route.kind), '<span class="nav-count">7</span>')}
       ${navLink('#/incidents', 'Incident gauntlet', 'bolt', route.kind === 'incidents' || route.id?.includes('/scenario-'), `<span class="nav-count">${catalog.labs.reduce((sum, lab) => sum + lab.scenarios.length, 0)}</span>`)}
       </nav><div class="nav-section-label">FIELD GUIDES</div><nav aria-label="Field guides">${guides.map(doc => navLink(guidePath(doc.id), guideLabels[doc.id] || doc.title, guideIcon(doc.id), route.kind === 'guide' && route.id === doc.id)).join('')}</nav>
       <div class="sidebar-footer"><div class="progress-caption"><span>YOUR PROGRESS</span><strong>${completed} / ${catalog.labs.length}</strong></div><progress class="progress-track" value="${completed}" max="${catalog.labs.length}" aria-label="Labs complete">${completed} of ${catalog.labs.length}</progress><p>Build. Diagnose. Explain.<br>Always leave a clean account.</p><button class="button ghost small" id="export-progress">${icon('download')} Export progress</button><label class="button ghost small progress-import">Restore backup<input id="import-progress" class="visually-hidden" type="file" accept="application/json,.json" aria-label="Restore progress backup"></label><span class="sidebar-local">Saved in this browser</span></div>`;
@@ -122,12 +124,12 @@
       const preview=C.mergeProgress(progress,raw,exercises.map(lab=>lab.id));
       closeMenu();
       const dialog=document.createElement('dialog'); dialog.className='backup-dialog';
-      dialog.innerHTML=`<h2>Restore your practice</h2><p>${preview.imported} mission records can be restored. ${preview.skipped} older or unknown records will be skipped. Newer browser notes are kept.</p><p>Imported practice clocks will be paused. This does not change running AWS resources.</p><div class="hero-actions"><button class="button primary" id="confirm-import">Merge backup</button><button class="button secondary" id="cancel-import">Cancel</button></div>`;
+      dialog.innerHTML=`<h2>Restore your practice</h2><p>${preview.imported} mission records and ${preview.drillAttempts} completed drill attempts are in this backup. ${preview.skipped} older or unknown mission records will be skipped. Newer browser notes are kept, and duplicate drill attempts are merged.</p><p>Imported practice clocks will be paused. This does not change running AWS resources.</p><div class="hero-actions"><button class="button primary" id="confirm-import">Merge backup</button><button class="button secondary" id="cancel-import">Cancel</button></div>`;
       document.body.append(dialog);dialog.showModal();
       dialog.addEventListener('close',()=>dialog.remove());
       dialog.querySelector('#cancel-import').onclick=()=>dialog.close();
       dialog.querySelector('#confirm-import').onclick=()=>{
-        const result=C.mergeProgress(progress,raw,exercises.map(lab=>lab.id));progress=result.progress;saveProgress();dialog.close();renderRoute();notify(`${result.imported} mission records restored.`);
+        const result=C.mergeProgress(progress,raw,exercises.map(lab=>lab.id));progress=result.progress;saveProgress();dialog.close();renderRoute();notify('Backup merged, including drill attempts.');
       };
     } catch(error) {notify(error.message);}
     event.target.value='';
@@ -150,10 +152,10 @@
       {name:'On-call & public access',range:[11,13],glyph:'bolt',description:`${catalog.labs.reduce((sum, lab) => sum + lab.scenarios.length, 0)} blind incidents, a capstone, and a real internet path to open and close.`}
     ];
     const terraform=toolchain?.components.find(item=>item.name.toLowerCase()==='terraform')?.version;
-    $('#main').innerHTML = `<section class="launchpad"><div><div class="eyebrow"><span class="status-dot"></span> TERRAFORM + EKS · MID–SENIOR</div><h1>Build the system.<br><span>Earn the explanation.</span></h1><p>Work a mission from first failure to proven fix. Keep the evidence, defend the tradeoffs, and close every session with teardown.</p><div class="hero-actions"><a class="button secondary" href="#/incidents">${icon('bolt')} Pick a blind incident</a><a class="inline-link" href="${guideLink('setup')}">Set up your tools ${icon('arrow')}</a></div></div><div class="resume-panel"><div class="eyebrow">${active.length?'PICK UP WHERE YOU LEFT OFF':'YOUR NEXT MISSION'}</div><h2>${esc(next.title)}</h2><p>${esc(next.summary)}</p><div class="path-meta"><span>LAB ${esc(next.number)} · ${esc(next.duration)}</span><span>${P.normalize(record(next.id).practice).completed.length} / 5 stages</span></div><a class="button primary" href="${esc(C.labRoute(next.id))}">${active.length?'Resume mission':'Enter mission'} ${icon('arrow')}</a><progress class="progress-track" value="${P.normalize(record(next.id).practice).completed.length}" max="5" aria-label="Next mission stages recorded"></progress></div></section>
+    $('#main').innerHTML = `<section class="launchpad"><div><div class="eyebrow"><span class="status-dot"></span> TERRAFORM + EKS · MID–SENIOR</div><h1>Build the system.<br><span>Earn the explanation.</span></h1><p>Work a mission from first failure to proven fix. Keep the evidence, defend the tradeoffs, and close every session with teardown.</p><div class="hero-actions"><a class="button primary" href="#/practice">Practice without AWS ${icon('arrow')}</a><a class="button secondary" href="#/incidents">${icon('bolt')} Pick a blind incident</a><a class="inline-link" href="${guideLink('setup')}">Set up your tools ${icon('arrow')}</a></div></div><div class="resume-panel"><div class="eyebrow">${active.length?'PICK UP WHERE YOU LEFT OFF':'YOUR NEXT MISSION'}</div><h2>${esc(next.title)}</h2><p>${esc(next.summary)}</p><div class="path-meta"><span>LAB ${esc(next.number)} · ${esc(next.duration)}</span><span>${P.normalize(record(next.id).practice).completed.length} / 5 stages</span></div><a class="button primary" href="${esc(C.labRoute(next.id))}">${active.length?'Resume mission':'Enter mission'} ${icon('arrow')}</a><progress class="progress-track" value="${P.normalize(record(next.id).practice).completed.length}" max="5" aria-label="Next mission stages recorded"></progress></div></section>
       <section class="practice-strip" aria-label="Practice overview"><div class="practice-stat"><span>LABS COMPLETE</span><div class="practice-stat-value">${doneCount()} <small>of ${catalog.labs.length}</small></div><p>Plus ${catalog.labs.reduce((sum, lab) => sum + lab.scenarios.length, 0)} isolated incidents</p></div><div class="practice-stat"><span>PRACTICE ALLOWANCE</span><div class="practice-stat-value">$20 <small>total</small></div><a href="${guideLink('cost')}">Plan cost & teardown</a></div><div class="practice-stat"><span>CLEANUP CHECKLIST</span><div class="practice-stat-value">${pendingCleanup?`${pendingCleanup} pending`:'No pending'}</div><p>Self-reported · verify in AWS</p></div><div class="practice-stat"><span>CURRENT TOOLCHAIN</span><div class="practice-stat-value">EKS ${esc(toolchain?.eks?.version||'—')}</div><a href="${guideLink('toolchain')}">${terraform?`Terraform ${esc(terraform)} · `:''}Release & validation details</a></div></section>
       <section><div class="catalog-heading"><div><div class="eyebrow">THREE PATHS · ONE COMPLETE PRACTICE LOOP</div><h2>Choose what to sharpen.</h2></div></div><div class="path-grid">${paths.map(path=>{const labs=catalog.labs.filter(lab=>Number(lab.number)>=path.range[0]&&Number(lab.number)<=path.range[1]),done=labs.filter(lab=>record(lab.id).status==='done').length,target=labs.find(lab=>record(lab.id).status!=='done')||labs[0];return `<a class="path-card" href="${C.labRoute(target.id)}"><span class="path-icon">${icon(path.glyph)}</span><span class="path-label">LABS ${String(path.range[0]).padStart(2,'0')}–${String(path.range[1]).padStart(2,'0')}</span><h3>${path.name}</h3><p>${path.description}</p><div class="path-meta"><span>${done} / ${labs.length} complete</span>${icon('arrow')}</div><progress class="path-progress" value="${done}" max="${labs.length}" aria-label="${path.name} progress"></progress></a>`;}).join('')}</div></section>
-      <section class="lab-section"><div class="section-heading"><div><div class="section-kicker">THE PRACTICE PATH</div><h2>Choose your next challenge</h2></div><span class="section-count" id="result-count">${catalog.labs.length} labs</span></div><div class="toolbar"><div class="filter-tabs" aria-label="Filter labs by track">${['All','Terraform','AWS','Kubernetes','Capstone'].map(t => `<button class="filter-button ${track === t ? 'active' : ''}" data-filter="${t}" aria-pressed="${track === t}">${t === 'All' ? 'All labs' : t}</button>`).join('')}</div><label class="search-field">${icon('search')}<input id="lab-search" type="search" placeholder="Find a lab…" aria-label="Search labs" value="${esc(query)}"><kbd>/</kbd></label></div><div class="lab-grid" id="lab-grid"></div></section><p class="footer-note">Small infrastructure. Serious practice. Run commands in your terminal and tear down at the end of every session.</p>`;
+      <section class="lab-section"><div class="section-heading"><div><div class="section-kicker">THE PRACTICE PATH</div><h2>Choose your next challenge</h2></div><span class="section-count" id="result-count">${catalog.labs.length} labs</span></div><div class="toolbar"><div class="filter-tabs" aria-label="Filter labs by track">${['All','Terraform','AWS','Kubernetes','Capstone'].map(t => `<button class="filter-button ${track === t ? 'active' : ''}" data-filter="${t}" aria-pressed="${track === t}">${t === 'All' ? 'All labs' : t}</button>`).join('')}</div><label class="search-field">${icon('search')}<input id="lab-search" type="search" placeholder="Find a lab…" aria-label="Search labs" value="${esc(query)}"><kbd>/</kbd></label></div><div class="lab-grid" id="lab-grid"></div></section><p class="footer-note">Small infrastructure. Serious practice. Environment controls + terminal runbook and tear down at the end of every session.</p>`;
     $('#lab-search').addEventListener('input', e => { query = e.target.value; renderCards(); });
     document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
       track = button.dataset.filter;
@@ -181,7 +183,7 @@
   const checkpoints = [['reproduce','Build or reproduce','I reached the expected starting state.'],['diagnose','Explain the behavior','I can explain the cause and tradeoffs.'],['verify','Prove the result','I ran the mission’s acceptance checks.'],['cleanup','Complete teardown','I followed cleanup and checked for leftovers.']];
   function renderSession(lab) {
     const saved = record(lab.id);
-    return `<aside class="session-panel" aria-label="Mission progress"><div class="session-label">YOUR SESSION</div><h3>Make it count.</h3><p class="session-intro">A working fix is only part of the answer.</p><div id="mission-status">${statusBadge(lab.id)}</div><button class="button ${saved.status === 'new' ? 'primary' : 'secondary'}" id="start-mission">${saved.status === 'new' ? 'Start this mission' : saved.status === 'done' ? 'Practice again' : 'Session in progress'} ${icon(saved.status === 'done' ? 'arrow' : 'terminal')}</button><div class="checklist">${checkpoints.map(([id,label,hint]) => `<label class="check-item"><input type="checkbox" data-check="${id}" ${saved.checks[id] ? 'checked' : ''}><span class="check-copy"><strong>${label}</strong><span class="check-hint">${hint}</span></span></label>`).join('')}</div><button class="button primary" id="complete-mission" ${!C.isComplete(saved) || saved.status === 'done' ? 'disabled' : ''}>${icon('check')} ${saved.status === 'done' ? 'Mission complete' : 'Mark complete'}</button><p class="session-fineprint">These are your own checks. The app cannot verify AWS cleanup.</p><div class="session-section"><div class="session-label">COST & CLEANUP</div><p>${esc(lab.cost)}</p><a class="inline-link" href="${guideLink('cost')}">Open the cleanup guide ${icon('arrow')}</a></div><div class="session-section"><div class="session-label">INTERVIEW REMINDER</div><p>What proved your hypothesis? Why does the fix work? What would you change in production?</p></div></aside>`;
+    return `<aside class="session-panel" aria-label="Mission progress"><div class="session-label">YOUR SESSION</div><h3>Make it count.</h3><p class="session-intro">A working fix is only part of the answer.</p><div id="mission-status">${statusBadge(lab.id)}</div><button class="button ${saved.status === 'new' ? 'primary' : 'secondary'}" id="start-mission">${saved.status === 'new' ? 'Start this mission' : saved.status === 'done' ? 'Practice again' : 'Session in progress'} ${icon(saved.status === 'done' ? 'arrow' : 'terminal')}</button><div class="checklist">${checkpoints.map(([id,label,hint]) => `<label class="check-item"><input type="checkbox" data-check="${id}" ${saved.checks[id] ? 'checked' : ''}><span class="check-copy"><strong>${label}</strong><span class="check-hint">${hint}</span></span></label>`).join('')}</div><button class="button primary" id="complete-mission" ${!C.isComplete(saved) || saved.status === 'done' ? 'disabled' : ''}>${icon('check')} ${saved.status === 'done' ? 'Mission complete' : 'Mark complete'}</button><p class="session-fineprint">These are your own checks. Inspect separate cleanup evidence in the Environment tab.</p><div class="session-section"><div class="session-label">COST & CLEANUP</div><p>${esc(lab.cost)}</p><a class="inline-link" href="${guideLink('cost')}">Open the cleanup guide ${icon('arrow')}</a></div><div class="session-section"><div class="session-label">INTERVIEW REMINDER</div><p>What proved your hypothesis? Why does the fix work? What would you change in production?</p></div></aside>`;
   }
   function wireSession(lab) {
     $('#start-mission').addEventListener('click', () => {
@@ -212,13 +214,29 @@
   async function renderLab(lab, version) {
     $('#topbar-title').textContent = `Workspace / ${lab.id.includes('/') ? 'Incident gauntlet' : 'Lab directory'} / ${lab.number}`;
     const parentHref = lab.id.includes('/') ? '#/incidents' : '#/';
-    const tabs = [['workspace','Workspace'],['brief','Runbook'],['files','Files'], ...(lab.hints ? [['hints','Hints']] : []), ...(lab.answers ? [['answers','Solution']] : []),['notes','My notes']];
+    const tabs = [['workspace','Workspace'],['session','Environment'],['brief','Runbook'],['files','Files'], ...(lab.hints ? [['hints','Hints']] : []), ...(lab.answers ? [['answers','Solution']] : []),['notes','My notes']];
+    let prerequisites='';
+    try {
+      const response=await fetch(`/api/launch?${new URLSearchParams({id:lab.id})}`);
+      if(response.ok){
+        const recipe=await response.json();
+        const dependencies=recipe.environmentPrerequisites||recipe.prerequisites;
+        const sequence={'12':'Keep Game 07 running. Destroy earlier exercise workloads through their own Terraform before starting the capstone.','02':'Apply the bootstrap root first. Configure the workload backend and migrate its state before continuing.','09':'Apply the IAM and Pod Identity root first, then the workload root.','10':'Apply the IAM root and finish the EBS driver setup before applying the workload root.','13':'Apply the workload root first, then the access root. Prove the final endpoint from outside the cluster. Remove access before destroying the workload.'}[recipe.alias];
+        if(dependencies.length||sequence)prerequisites=`<section class="mission-prerequisites" aria-label="Required infrastructure"><h2>Before this exercise: bring up the prerequisites.</h2><p>Prepared files are not a running environment. Review and apply the prerequisite Terraform, then complete its readiness checks.</p>${dependencies.length?`<ol>${dependencies.map(id=>`<li><a href="${C.labRoute(id)}">${esc(exercises.find(item=>item.id===id)?.title||id)}</a> — follow its setup, plan, apply and verification steps.</li>`).join('')}</ol>`:''}${sequence?`<p><strong>Setup order:</strong> ${sequence}</p>`:''}<p>Open the <a href="${C.labRoute(lab.id,'session')}">Environment tab</a> or <code>arcade tui</code> for provisioning, evidence and cleanup. Keep the foundation until dependent workloads have been destroyed.</p></section>`;
+      }
+    }catch{prerequisites='<section class="mission-prerequisites"><h2>Check prerequisites in the runbook.</h2><p>The setup list could not be loaded. Do not treat a prepared workspace as a ready environment.</p></section>';}
+    if(version!==renderVersion)return;
     if (!tabs.some(([id]) => id === route.tab)) route.tab = 'workspace';
-    $('#main').innerHTML = `<a class="back-link" href="${parentHref}">${icon('back')} ${lab.id.includes('/') ? 'All incidents' : 'All labs'}</a><div class="mission-header"><div class="eyebrow">${lab.id.includes('/') ? 'INCIDENT' : 'LAB'} ${esc(lab.number)} <span>/</span> ${esc(lab.track)}</div><h1>${esc(lab.title)}</h1><p>${esc(lab.summary)}</p><div class="mission-meta"><span>${icon('clock')} ${esc(lab.duration)}</span><span>${icon(trackIcon(lab.track))} ${esc(lab.mode)}</span><span>${icon('terminal')} Run commands in your terminal</span></div></div><div class="detail-grid ${route.tab === 'workspace' ? 'workspace-detail' : ''}"><section class="reader-panel"><nav class="reader-tabs" aria-label="Mission views">${tabs.map(([id,label]) => `<a class="tab-button ${route.tab === id ? 'active' : ''}" ${route.tab === id ? 'aria-current="page"' : ''} href="${esc(C.labRoute(lab.id,id))}">${id === 'answers' ? icon('lock') : ''}${label}${id === 'files' ? `<span>${lab.files.length}</span>` : ''}</a>`).join('')}</nav><div id="reader-content" class="reader-content ${route.tab === 'workspace' ? 'workspace-content' : ''}"><div class="loading-state">Opening source…</div></div></section>${route.tab === 'workspace' ? '' : renderSession(lab)}</div>`;
-    if(route.tab !== 'workspace') wireSession(lab);
+    $('#main').innerHTML = `<a class="back-link" href="${parentHref}">${icon('back')} ${lab.id.includes('/') ? 'All incidents' : 'All labs'}</a><div class="mission-header"><div class="eyebrow">${lab.id.includes('/') ? 'INCIDENT' : 'LAB'} ${esc(lab.number)} <span>/</span> ${esc(lab.track)}</div><h1>${esc(lab.title)}</h1><p>${esc(lab.summary)}</p><div class="mission-meta"><span>${icon('clock')} ${esc(lab.duration)}</span><span>${icon(trackIcon(lab.track))} ${esc(lab.mode)}</span><span>${icon('terminal')} Environment controls + terminal runbook</span></div></div><div class="detail-grid ${['workspace','session'].includes(route.tab) ? 'workspace-detail' : ''}"><section class="reader-panel"><nav class="reader-tabs" aria-label="Mission views">${tabs.map(([id,label]) => `<a class="tab-button ${route.tab === id ? 'active' : ''}" ${route.tab === id ? 'aria-current="page"' : ''} href="${esc(C.labRoute(lab.id,id))}">${id === 'answers' ? icon('lock') : ''}${label}${id === 'files' ? `<span>${lab.files.length}</span>` : ''}</a>`).join('')}</nav><div id="reader-content" class="reader-content ${route.tab === 'workspace' ? 'workspace-content' : ''}"><div class="loading-state">Opening source…</div></div></section>${['workspace','session'].includes(route.tab) ? '' : renderSession(lab)}</div>`;
+    if(!['workspace','session'].includes(route.tab)) wireSession(lab);
+    if(prerequisites)$('#main').querySelector('.detail-grid').insertAdjacentHTML('beforebegin',prerequisites);
     const panel = $('#reader-content');
     if (route.tab === 'workspace') {
       practiceCleanup=await window.ArcadePractice.mount(panel,lab,{esc,icon,record,updateRecord,notify,copyText,getFile,renderMarkdown,isCurrent:()=>version===renderVersion});
+      return;
+    }
+    if (route.tab === 'session') {
+      practiceCleanup=await window.ArcadeSession.mount(panel,lab,{esc,notify,isCurrent:()=>version===renderVersion});
       return;
     }
     if (route.tab === 'notes') { renderNotes(lab,panel); return; }
@@ -358,6 +376,12 @@
     const main=$('#main'); main.setAttribute('aria-busy','true');
     try {
       if (route.kind === 'home') renderHome();
+      else if (route.kind === 'practice' || route.kind === 'drill') {
+        $('#topbar-title').textContent='Practice desk / No AWS required';
+        const context={esc,icon,notify,isCurrent:()=>version===renderVersion,getState:()=>progress.drills,setState:value=>{progress.drills=value;saveProgress();}};
+        if(route.kind==='practice')await window.ArcadeDrills.desk(main,context);
+        else practiceCleanup=await window.ArcadeDrills.mount(main,route.id,context)||(()=>{});
+      }
       else if (route.kind === 'incidents') renderIncidents();
       else if (route.kind === 'lab') {
         const lab=exercises.find(l => l.id === route.id);
@@ -407,7 +431,18 @@
       try { const versions=await fetch('/api/toolchain'); if(versions.ok)toolchain=await versions.json(); } catch { /* Guides remain available if the version manifest cannot load. */ }
       exercises=catalog.labs.flatMap(lab => [lab,...lab.scenarios]);
       window.addEventListener('hashchange',renderRoute);
-      window.addEventListener('storage', event=>{ if(event.key===KEY && event.newValue) {progress=C.mergeStored(progress,C.readProgress(event.newValue));notify('Progress changed in another tab. Reopen this mission to load its latest details.');renderSidebar();} });
+      window.addEventListener('storage', event=>{
+        if(event.key!==KEY||!event.newValue)return;
+        const previous=route.kind==='drill'?JSON.stringify(progress.drills.current[route.id]):null;
+        progress=C.mergeStored(progress,C.readProgress(event.newValue));
+        if(route.kind==='drill'&&previous!==JSON.stringify(progress.drills.current[route.id])) {
+          void renderRoute();
+          notify('Practice updated from another tab. The current attempt has been refreshed.');
+        } else {
+          notify('Progress changed in another tab. Reopen this mission to load its latest details.');
+          renderSidebar();
+        }
+      });
       await renderRoute();
     } catch {
       $('#main').innerHTML='<div class="error-state"><h1>The local server is unavailable.</h1><p>Run <code>python3 web/server.py</code> from the project folder, then reload this page.</p><button class="button primary" id="reload-app">Reload</button></div>';

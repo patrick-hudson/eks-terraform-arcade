@@ -2,14 +2,16 @@
   'use strict';
   const P = typeof module !== 'undefined' && module.exports ? require('./practice-core.js') : root.ArcadePracticeCore;
   const V = typeof module !== 'undefined' && module.exports ? require('./verification-core.js') : root.ArcadeVerificationCore;
+  const D = typeof module !== 'undefined' && module.exports ? require('./drills-core.js') : root.ArcadeDrillsCore;
   const checkpointIds = ['reproduce', 'diagnose', 'verify', 'cleanup'];
   const blankRecord = () => ({ status: 'new', checks: {}, notes: '', updatedAt: null, practice: P.normalize(null), receipts: [] });
   const isComplete = record => checkpointIds.every(key => record?.checks?.[key] === true);
   function readProgress(raw) {
-    const empty = { schemaVersion: 2, labs: {}, lastLab: null };
+    const empty = { schemaVersion: 3, labs: {}, lastLab: null, drills: D.normalize(null) };
     try {
       const parsed = JSON.parse(raw);
-      if (!parsed || ![1,2].includes(parsed.schemaVersion) || !parsed.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') return empty;
+      if (!parsed || ![1,2,3].includes(parsed.schemaVersion) || !parsed.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') return empty;
+      empty.drills = D.normalize(parsed.drills);
       for (const [id, record] of Object.entries(parsed.labs)) {
         if (!record || typeof record !== 'object' || ['__proto__', 'constructor', 'prototype'].includes(id)) continue;
         const clean = blankRecord();
@@ -32,11 +34,13 @@
     for (const [id, record] of Object.entries(incoming.labs)) {
       if (!merged.labs[id] || timestamp(record.updatedAt) > timestamp(merged.labs[id].updatedAt)) merged.labs[id] = record;
     }
+    merged.drills = D.merge(merged.drills, incoming.drills);
     return merged;
   }
   function snapshotProgress(progress, now=Date.now()) {
     const snapshot=readProgress(JSON.stringify(progress));
     snapshot.exportedAt=new Date(now).toISOString();
+    snapshot.drills=D.snapshot(snapshot.drills,now);
     for(const record of Object.values(snapshot.labs)) record.practice.timer={elapsedMs:P.elapsed(record.practice,now),runningSince:null};
     return snapshot;
   }
@@ -46,7 +50,7 @@
   function mergeProgress(current, raw, knownIds) {
     let parsed;
     try { parsed = JSON.parse(raw); } catch { throw new Error('This is not a valid progress backup.'); }
-    if (!parsed || ![1,2].includes(parsed.schemaVersion) || !parsed.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') throw new Error('This backup has an unsupported format.');
+    if (!parsed || ![1,2,3].includes(parsed.schemaVersion) || !parsed.labs || Array.isArray(parsed.labs) || typeof parsed.labs !== 'object') throw new Error('This backup has an unsupported format.');
     const incoming = readProgress(raw), progress = readProgress(JSON.stringify(current));
     const known = new Set(knownIds);
     let imported = 0, skipped = 0;
@@ -60,7 +64,10 @@
       progress.labs[id] = record; imported++;
     }
     if (!progress.lastLab && known.has(incoming.lastLab)) progress.lastLab = incoming.lastLab;
-    return {progress, imported, skipped};
+    const cutoff=Date.parse(parsed.exportedAt);
+    const frozen=D.snapshot(incoming.drills,Number.isFinite(cutoff)?cutoff:0);
+    progress.drills=D.merge(progress.drills,frozen);
+    return {progress, imported, skipped, drillAttempts:incoming.drills.history.length};
   }
   function labRoute(id, tab = 'workspace', file = '') {
     const query = new URLSearchParams({ tab });
@@ -72,11 +79,13 @@
       const [path, query] = hash.replace(/^#/, '').split('?');
       if (!path || path === '/') return { kind: 'home' };
       if (path === '/incidents') return { kind: 'incidents' };
+      if (path === '/practice') return { kind: 'practice' };
+      if (path.startsWith('/drill/')) return { kind: 'drill', id: decodeURIComponent(path.slice(7)) };
       if (path.startsWith('/guide/')) return { kind: 'guide', id: decodeURIComponent(path.slice(7)) };
       if (path.startsWith('/lab/')) {
         const params = new URLSearchParams(query);
         const tab = params.get('tab') || 'workspace';
-        return { kind: 'lab', id: decodeURIComponent(path.slice(5)), tab: ['workspace','brief','files','hints','answers','notes'].includes(tab) ? tab : 'brief', file: params.get('file') || '' };
+        return { kind: 'lab', id: decodeURIComponent(path.slice(5)), tab: ['workspace','session','brief','files','hints','answers','notes'].includes(tab) ? tab : 'brief', file: params.get('file') || '' };
       }
     } catch { return { kind: 'missing' }; }
     return { kind: 'missing' };

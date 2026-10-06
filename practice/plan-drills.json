@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "drills": [
+    {
+      "id": "plan-replacement-order",
+      "kind": "plan",
+      "title": "Two replacements, one release window",
+      "summary": "Decide what two replacement orders establish about a proposed rollout.",
+      "brief": "A teammate wants to use a short release window to replace two instances. They say that a plan showing replacements proves the release will be uninterrupted. Inspect the proposed operations and operating constraint, then choose the review response you can support.",
+      "minutes": 8,
+      "skills": ["plan-reading", "replacement-order", "evidence-limits"],
+      "relatedLabs": ["00-terraform-contracts", "06-state-rescue"],
+      "observations": [
+        {
+          "id": "change-actions",
+          "label": "Proposed resource actions",
+          "command": "Inspect the authored terraform show -json excerpt (display only)",
+          "output": "AUTHORED SIMULATION — not captured from AWS.\nresource_changes:\n  aws_instance.frontend: actions = [\"create\", \"delete\"]\n  aws_instance.worker: actions = [\"delete\", \"create\"]\ncomplete = true\napplyable = true\nNo other resource changes appear in this excerpt."
+        },
+        {
+          "id": "availability-constraint",
+          "label": "Service and capacity constraint",
+          "command": "Read the authored release constraint (display only)",
+          "output": "AUTHORED SIMULATION. One worker processes the queue; no standby worker exists. A frontend must pass its service health check before it can receive traffic. The team has not checked capacity for an extra frontend or tested its traffic handover."
+        },
+        {
+          "id": "resource-summary",
+          "label": "Count proposed work",
+          "command": "Inspect the authored value-free plan-coach summary (display only)",
+          "output": "AUTHORED SIMULATION. Resource addresses: 2. Replacement records: 2. Action counts: create=2, delete=2, update=0, read=0, no-op=0. These are four operations on two resource addresses. Plan metadata does not verify live availability, ownership or price."
+        }
+      ],
+      "question": {
+        "prompt": "Which review conclusion is supported by the evidence?",
+        "options": [
+          {"id": "guaranteed-availability", "text": "Both replacements preserve availability because complete is true."},
+          {"id": "different-orders", "text": "The worker deletes first; the frontend creates first. Availability still needs a capacity and handover plan."},
+          {"id": "four-resources", "text": "The plan creates and deletes four distinct resource addresses."}
+        ]
+      },
+      "answer": {
+        "optionId": "different-orders",
+        "explanation": "Action order belongs to each replacement. The worker is deleted before its replacement is created, leaving no worker in the stated setup. The frontend replacement is created first, but creation alone does not prove health, traffic handover or spare capacity. The complete flag describes Terraform's expected convergence, not application availability. Two replacements contribute two creates and two deletes while involving only two resource addresses.",
+        "decisiveEvidence": ["change-actions", "availability-constraint"],
+        "repair": "Keep any rollout change in Terraform. If continuous worker service is required, design and declare overlap or redundancy and its handover before repeating the plan. A create_before_destroy lifecycle setting can change replacement order where the provider, naming rules and capacity permit it; it cannot supply an application health or traffic switch by itself.",
+        "verification": "Review a fresh saved plan for the intended order, then use the live mission's explicit process to prove replacement readiness, traffic handover and worker processing. A passing plan or this simulated answer does not provide that live proof.",
+        "cleanup": "If a later authorized live exercise creates overlap, account for both old and new objects and preserve state until the mission's cleanup checks confirm removal. Restrict cleanup to owned practice resources and the shared $20 total allowance. This drill creates nothing.",
+        "followUp": "The team now has capacity for only one instance and permits no interruption. What constraint must change, and what evidence would you request before approving a rollout design?"
+      },
+      "provenance": "Authored simulation for plan-reading practice. No commands are executed and no AWS run was captured."
+    },
+    {
+      "id": "plan-address-change",
+      "kind": "plan",
+      "title": "One rename, two proposed plans",
+      "summary": "Compare a source rename with a recorded address move.",
+      "brief": "The configuration label workload was renamed to service. The intent is to keep the same existing object and change only its Terraform address. Two proposed plans are available. Decide which one carries evidence of that intent and what still needs checking.",
+      "minutes": 7,
+      "skills": ["plan-reading", "resource-addresses", "state-moves"],
+      "relatedLabs": ["06-state-rescue", "00-terraform-contracts"],
+      "observations": [
+        {
+          "id": "plan-a",
+          "label": "Plan A resource records",
+          "command": "Inspect authored plan A JSON metadata (display only)",
+          "output": "AUTHORED SIMULATION.\nterraform_data.workload[\"api\"]: actions = [\"delete\"]\nterraform_data.service[\"api\"]: actions = [\"create\"]\nNeither record contains previous_address. The old address is present in the prior state."
+        },
+        {
+          "id": "plan-b",
+          "label": "Plan B resource records",
+          "command": "Inspect authored plan B JSON metadata (display only)",
+          "output": "AUTHORED SIMULATION.\naddress = terraform_data.service[\"api\"]\nprevious_address = terraform_data.workload[\"api\"]\nactions = [\"no-op\"]\nNo delete or create is proposed for this object."
+        },
+        {
+          "id": "source-change",
+          "label": "Declared source changes",
+          "command": "Read the authored configuration comparison (display only)",
+          "output": "AUTHORED SIMULATION. Both candidates rename the resource label without changing arguments or the api instance key. Plan A has no moved block. Plan B also declares:\nmoved {\n  from = terraform_data.workload[\"api\"]\n  to   = terraform_data.service[\"api\"]\n}"
+        }
+      ],
+      "question": {
+        "prompt": "Which plan matches the stated address-only intent?",
+        "options": [
+          {"id": "either-plan", "text": "Either plan; Terraform always recognizes a rename from matching values."},
+          {"id": "plan-a", "text": "Plan A, because a delete and a create are how every address move is represented."},
+          {"id": "plan-b", "text": "Plan B records the previous address and no value change; Plan A proposes deleting and creating objects."}
+        ]
+      },
+      "answer": {
+        "optionId": "plan-b",
+        "explanation": "The previous_address marker records a move. Combined with no-op, Plan B describes an address change with no proposed resource value change. Plan A contains independent delete and create actions; matching arguments do not by themselves preserve the association with state. A move can coexist with an update or replacement in other plans, so the marker alone is not enough: read its actions too.",
+        "decisiveEvidence": ["plan-a", "plan-b", "source-change"],
+        "repair": "Declare the intended moved block in the Terraform source and review the full saved plan against the correct existing state. Keep the move available for other workspaces that still use the old address. Do not erase state to make the rename appear clean.",
+        "verification": "For an authorized live migration, preserve a state backup, confirm the workspace and expected old object, then confirm the new address refers to the same object after the reviewed apply and a subsequent plan has no unintended actions. A move marker alone does not verify live ownership or service health.",
+        "cleanup": "This simulated comparison leaves no state or resources. In a hands-on mission, use the post-move source and state for scoped cleanup; deleting state or removing a resource block is not proof that the underlying object was removed.",
+        "followUp": "The destination resource also changes an argument that requires replacement. How could a move marker and a replacement appear together, and which original claim would you revise?"
+      },
+      "provenance": "Authored simulation for plan-reading practice. Resource names and plan excerpts are teaching examples, not captured live evidence."
+    },
+    {
+      "id": "plan-incomplete-evidence",
+      "kind": "plan",
+      "title": "A small diff with unfinished evidence",
+      "summary": "Separate proposed actions, observed drift and information deferred until later.",
+      "brief": "A reviewer sees one proposed Lambda update and suggests that the small diff proves recovery is complete. The service previously failed to write a counter. Inspect the available plan observations and choose what can be concluded before returning to the mission's live verification steps.",
+      "minutes": 9,
+      "skills": ["plan-reading", "drift", "unknown-values", "evidence-limits"],
+      "relatedLabs": ["05-serverless-counter", "04-iam-boundaries", "06-state-rescue"],
+      "observations": [
+        {
+          "id": "proposed-change",
+          "label": "Proposed action and unknown values",
+          "command": "Inspect the authored resource_changes excerpt (display only)",
+          "output": "AUTHORED SIMULATION.\nresource_changes:\n  aws_lambda_function.counter: actions = [\"update\"]\n  after_unknown = {\"last_modified\": true}\noutput_changes:\n  function_version: after_unknown = true\nAttribute values and output values are intentionally omitted."
+        },
+        {
+          "id": "plan-status",
+          "label": "Completeness and deferred work",
+          "command": "Inspect authored top-level plan metadata (display only)",
+          "output": "AUTHORED SIMULATION.\napplyable = true\ncomplete = false\nerrored = false\ndeferred_changes contains an aws_iam_role_policy.counter resource_change. Its eventual action depends on information not available in this plan. The deferred entry is separate from resource_changes."
+        },
+        {
+          "id": "observed-drift",
+          "label": "Drift and missing live evidence",
+          "command": "Inspect the authored resource_drift and incident notes (display only)",
+          "output": "AUTHORED SIMULATION.\nresource_drift:\n  aws_lambda_function.counter: actions = [\"update\"]\nThis compares the refresh observation with prior saved state; it is not another proposed update. No successful counter invocation, DynamoDB result or current live permission check is included."
+        }
+      ],
+      "question": {
+        "prompt": "What does this evidence support?",
+        "options": [
+          {"id": "recovered", "text": "Recovery is proven because applyable is true and only one update appears."},
+          {"id": "incomplete", "text": "One update is proposed, but deferred work and incomplete status remain; runtime recovery still needs direct evidence."},
+          {"id": "three-updates", "text": "There are three certain updates: the proposal, drift and deferred entry each add one."}
+        ]
+      },
+      "answer": {
+        "optionId": "incomplete",
+        "explanation": "Resource changes describe the proposed action; resource_drift describes a difference observed during refresh. Counting them together would double-count different kinds of evidence. The false complete flag and deferred entry show that this plan is not the whole convergence story. Unknown values are not empty values and do not independently indicate a failure. Applyable is Terraform metadata, not proof of correct permissions, successful requests, safe ownership or affordable cost.",
+        "decisiveEvidence": ["proposed-change", "plan-status", "observed-drift"],
+        "repair": "Use the mission's diagnostics to identify the actual configuration or permission defect, then express the correction in Terraform. Resolve the missing information and review a fresh complete plan, including whether observed drift should be kept in source or reverted. Do not invent a permission change from these excerpts alone or treat a Console patch as the durable fix.",
+        "verification": "Review subsequent plan results and independently exercise the counter with the mission's scoped live checks, confirming both a successful request and the expected stored result. Where a mission requires internet reachability, record its explicit live internet test too. A simulated answer or local plan cannot establish those outcomes.",
+        "cleanup": "This drill makes no AWS calls. Any later live work must remain within owned practice resources, the $20 total allowance and the mission's cleanup process, preferably in us-west-2. Preserve state and track unresolved resources after failed cleanup rather than treating an empty or incomplete plan as proof of removal.",
+        "followUp": "A fresh plan is complete and shows no changes, but counter requests still fail. Which observation would distinguish a runtime permission problem from an incorrect request, and what does the clean plan actually prove?"
+      },
+      "provenance": "Authored simulation combining Terraform metadata shapes to teach evidence limits. It is not a captured AWS plan or proof of a live repair."
+    }
+  ]
+}
