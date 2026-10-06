@@ -7,15 +7,17 @@ You have an AWS account, possibly with existing resources, and must build a sepa
 Your build must have:
 
 - Two `/24` public subnets in separate supported availability zones, an internet gateway and explicit routes.
-- An EKS 1.37 control plane with standard support, private API connectivity for nodes, and public API access restricted to your current IPv4 `/32`.
+- An EKS 1.37 control plane named `${var.lab_id}-arcade` with standard support, private API connectivity for nodes, and public API access restricted to your current IPv4 `/32`.
 - API access entries and an explicit permanent IAM administrator principal. Disable implicit cluster-creator admin.
-- One managed AL2023 `t3.medium` node, 20 GiB encrypted gp3 root disk, deletion on termination, required IMDSv2 and hop limit 1. Use standard T3 credits to avoid surplus-credit charges. Maximum group size is two; no autoscaler is installed.
+- A managed node group named `lab` with one AL2023 `t3.medium` node, 20 GiB encrypted gp3 root disk, deletion on termination, required IMDSv2 and hop limit 1. Use standard T3 credits to avoid surplus-credit charges. Maximum group size is two; no autoscaler is installed.
 - Managed VPC CNI, kube-proxy, CoreDNS and Pod Identity agent add-ons. Bootstrap networking before the node; adopt it after the node joins.
 - Outputs `cluster_name`, `region`, `vpc_id`, `node_role_arn`, `cluster_security_group_id`; node label `role=lab`.
 
 Public subnets are a deliberate cost tradeoff for this isolated exercise. The node has no public inbound rule or SSH access. A production answer should discuss private nodes, endpoint design, egress controls, multiple nodes/AZs, availability, control-plane logs, patching and cost. The node IAM role includes CNI permissions here; discuss moving them to the CNI service account in a hardened platform.
 
 ## Build and apply
+
+Using Arcade? Follow [the launch walkthrough](../../docs/lab-launcher.md#3-build-and-create-the-eks-cluster--game-07): prepare **starter**, write `main.tf`, then configure, plan and apply. The cluster and node-group names above are required by the runner and readiness checks. The commands below are the manual alternative; do not repeat their file-copy step in an already prepared workspace.
 
 First complete [setup](../../docs/setup.md). Use the IAM role/user ARN behind your AWS CLI session for `TF_VAR_admin_principal_arn`; an STS `assumed-role` ARN is invalid. For IAM Identity Center, use the permanent IAM role ARN including its path, and keep that CLI profile active. The package is for the standard `aws` partition.
 

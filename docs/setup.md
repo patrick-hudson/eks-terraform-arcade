@@ -1,26 +1,12 @@
 # Setup and account preflight
 
-Start with the local Practice desk. It needs Python 3.10+ and no AWS credentials or downloaded lab tools. The preferred workload region for later hands-on work is **us-west-2 (Oregon)**. Use a disposable sandbox or the [shared-account ownership rules](cost-and-cleanup.md); commands you apply in AWS are billable.
+For the complete real AWS launch sequence, use [Launch an AWS lab](lab-launcher.md). This page supplies tool installation, login and account checks. The preferred region is **us-west-2 (Oregon)**. A shared account is supported; follow the [ownership and cleanup rules](cost-and-cleanup.md).
 
-## 1. Complete an offline exercise
+## 1. Choose your launch interface
 
-From your checkout or extracted kit:
+Use the [command-line walkthrough](lab-launcher.md), [terminal workspace](tui.md) or [browser runner](web-ui.md). All three use the same Terraform workspaces. Start with Game 07 in starter mode, write its cluster Terraform, then launch Incident 11-01; local exercises are optional.
 
-```bash
-./arcade serve
-```
-
-Open [the Practice desk](http://127.0.0.1:8765/#/practice), choose a simulated drill, reveal evidence and finish an attempt. The server and drills use Python's standard library; no pip packages or Node installation are required. If a port is busy, use `./arcade serve --port 8766` and open the corresponding URL. Ctrl-C stops the server, not AWS resources.
-
-For the full-screen terminal workspace, open another interactive terminal:
-
-```bash
-./arcade tui
-```
-
-This requires Python's standard-library curses module. Browsing and simulations need no AWS login. Environment actions require the tools and account preflight below. See [the terminal guide](tui.md) for platform limits, keyboard controls and recovery.
-
-The root `arcade` entry needs Bash and works before PATH activation. From another directory, invoke it by absolute path. For a Python-only browser entry, `python3 web/server.py` remains available.
+The root `arcade` entry requires Bash and Python 3.10+. It works from the project directory before PATH activation. The TUI also requires Python's standard-library curses module. Install the lab tools below before provisioning AWS.
 
 ## 2. Install tools and activate a lab terminal
 
@@ -114,7 +100,7 @@ Before a live exercise, run `./arcade start ID` or `./arcade next ID` from the c
 
 Game 07 supplies the cluster for Games 08–13 and the individual incidents. Keep its state and use the mission's own working directory for each dependent workload. For multi-root runbooks, follow their internal order: Game 09 creates its AWS resources before the workload; Game 10 creates AWS resources and proves the storage controller ready before the workload; Game 13 creates the workload before public access and removes access before the workload.
 
-The terminal manages Games 00, 01, 03, 04, 05, 07, 08 and incidents 11-01 through 11-10. Complex roots hand off to runbooks; see the [support matrix](tui.md). Game 05 guided mode deliberately retains its starting fault until you repair the Terraform input. Incident 11-10 needs a healthy v1 baseline and live readiness/HTTP proof before its separately reviewed broken update. Neither shortcutting prerequisite verification nor an empty namespace reproduces that update incident.
+The CLI, TUI and browser runner manage Games 00, 01, 03, 04, 05, 07, 08, 09, 10, 13 and incidents 11-01 through 11-10. Games 02, 06 and 12 use ordered manual runbooks; see the [support matrix](tui.md#environment-support). Game 05 guided mode deliberately retains its starting fault until you repair the Terraform input. Incident 11-10 needs a healthy v1 baseline and live readiness/HTTP proof before its separately reviewed broken update. Neither shortcutting prerequisite verification nor an empty namespace reproduces that update incident.
 
 ## 6. Standard apply and cleanup loop
 

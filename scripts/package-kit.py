@@ -47,6 +47,7 @@ ADDED_FILES = [
     'docs/images/public-access.jpg',
     'docs/images/workspace.jpg',
     'docs/lab-launcher.md',
+    'docs/launcher-reference.md',
     'docs/learning-design.md',
     'docs/live-verification.md',
     'docs/local-rehearsal.md',
