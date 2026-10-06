@@ -1,34 +1,83 @@
 # Web workspace
 
-The local workspace contains 24 hands-on missions (14 games and ten individual incidents) and seven separate simulated drills. The hands-on five-stage workflow contains 120 stages, 240 task checkpoints, 72 progressive investigation hints and 24 interview reasoning checks. It reads the same runbooks and code files you can open in your editor.
+Use the browser to launch real AWS resources, work through an incident and tear the environment down. This guide walks through one complete EKS session; [Launch real AWS labs](lab-launcher.md) has the matching terminal commands and other cloud lessons.
 
-## Start and stop
+## Start the web runner
 
-Use Python 3.10 or newer on Linux, macOS or WSL2. From the project root:
+**For real AWS labs, start here.** The browser can create and remove the lab resources through Terraform; your terminal is where you inspect pods and edit the broken configuration. You can skip Game 00 and the simulated Practice desk.
 
-```bash
-./arcade serve
-```
-
-Open **[the Practice desk](http://127.0.0.1:8765/#/practice)** and keep that terminal running. This default mode is read-only: it displays authored content and local session status without running lab operations. No npm installation, AWS credentials or internet connection is needed to browse or use simulated drills. External documentation and actual lab commands have their usual internet requirements.
-
-If the port is occupied:
+From a Bash terminal:
 
 ```bash
-./arcade serve --port 8766
+cd ~/work/eks-terraform-examples
+./arcade setup
+./arcade serve --runner
 ```
 
-Then open [the alternate local port](http://127.0.0.1:8766). The server accepts only loopback connections. Press Ctrl-C in its terminal to stop it. **Stopping the server leaves any AWS resources you created running.** Finish the mission’s cleanup instructions separately.
+`setup` installs the local tools; it does not create AWS resources. Keep the server terminal running. Open **[Launch real AWS labs](http://127.0.0.1:8765/#/guide/lab-launcher)** for the recommended path, including AWS login checks and the exact account, IAM and public-IP values you need. The steps below are the browser version of that path.
 
-## Practice before provisioning
+If port 8765 is occupied by an older Arcade server, stop that server with Ctrl-C and run it again with `--runner`. Alternatively, use `./arcade serve --runner --port 8766` and open [port 8766](http://127.0.0.1:8766). Browser notes are separate on each port; Terraform workspaces are shared.
 
-The **Practice desk** has four authored investigations and three Terraform plan-reading drills. Their observation output is simulated, and displayed diagnostic commands never execute. Open a brief, reveal one observation at a time, choose a decision and read the explanation. The debrief connects decisive evidence to a Terraform repair, recovery proof, cleanup and a changed-constraint interview question.
+## First session: EKS cluster → broken pod → cleanup
 
-Select **Finish attempt** after choosing an answer to save a compact summary. Merely opening, refreshing or revisiting a drill does not record a completion. **New attempt** starts another repetition; completed attempts stay separate from the 24 hands-on mission records. The newest 20 summaries retain the drill, completion time, first-answer result, revealed observation IDs and practice duration. A drill result does not prove cloud health, cleanup, safety or mastery.
+This creates a real EKS control plane and one EC2 worker in **us-west-2**, then a broken application to repair. Allow about **45–60 minutes including cluster setup**. The shared cluster is approximately **$0.15 for one hour / $0.30 for two hours**, before extra activity and provisioning/deletion time. See [the cost assumptions](cost-and-cleanup.md).
 
-The desk suggests an incorrectly answered drill first, then a never-attempted drill, then the least recently completed one. It shows its reason and lets you choose freely. Export and restore preserve the summaries and current attempt; repeated restore does not duplicate attempts with the same ID.
+### 1. Create the cluster once
 
-For the same authored content in a terminal, use `./arcade drill list` or the [full-screen terminal workspace](tui.md). The Environment tab shows a value-free summary of a saved session plan. For other local plans, [the plan coach](plan-review.md) accepts Terraform show JSON through `./arcade review-plan PATH` or standard input. There is no plan-upload endpoint; raw plan values stay out of the browser.
+Open **[Game 07 → Environment](http://127.0.0.1:8765/#/lab/07-eks-foundation?tab=session)**.
+
+1. Set **Starting point** to **starter**, then select **Prepare workspace**. This creates `run/07-eks-foundation/` with `versions.tf`, a provider lockfile and `BUILD.md`. **There is no cluster implementation yet.** Preparing these files creates nothing in AWS.
+2. Open **Runbook** and write **`run/07-eks-foundation/main.tf`** in your editor. Building the cluster is the Game 07 exercise. Follow `BUILD.md` for the network, EKS cluster, worker, access and add-on requirements. Keep the supplied provider settings in `versions.tf`; add the `admin_principal_arn` and `allowed_cidr` inputs and all five required outputs in your Terraform. Use **Hints** if needed. Finish this implementation before selecting **Plan changes**.
+3. Return to **Environment → Account & environment**. Enter your authenticated AWS profile, intended account ID, `us-west-2`, a unique resource prefix, permanent IAM user/role ARN and your public IPv4 followed by `/32`. Use the values collected in [the launch guide](lab-launcher.md), then choose **Save environment**.
+4. Choose **Plan changes** and review **Saved plan**. The browser shows action metadata; use the saved-plan command below in a second terminal to inspect its full values. Confirm the intended account, one small worker, the restricted IP range and no NAT gateway or load balancer before applying. A plan with no cluster or worker means you have not finished the implementation.
+5. Type the exact approval phrase shown, then choose **Apply reviewed plan**. **This is the step that creates billable AWS resources.** Wait for it to finish; a cluster can take 15–25 minutes to become ready.
+6. Select **Submit repair** and read **Repair evidence**. Do not start a pod exercise until the foundation checks pass. If a check fails, use its expected/observed details and the Game 07 runbook to investigate.
+
+To read the complete Game 07 plan after **Plan changes** finishes, run:
+
+```bash
+cd ~/work/eks-terraform-examples
+source scripts/env.sh
+terraform -chdir="$LAB_ROOT/run/07-eks-foundation" show arcade-apply.tfplan
+```
+
+Then return to the browser to approve that plan. After **Plan cleanup**, the corresponding file is `arcade-destroy.tfplan`.
+
+**Optional shortcut:** choosing **guided** before preparing a new Game 07 workspace copies the complete reference Terraform. Use this only when you want to skip the cluster-building exercise and focus on pod incidents. An existing workspace keeps its original starting point and edits.
+
+Keep Game 07 running while you work through an incident. Do not create a second cluster for each exercise.
+
+### 2. Deploy the broken application
+
+Open **[Incident 01 → Environment](http://127.0.0.1:8765/#/lab/11-incident-gauntlet%2Fscenario-01?tab=session)**.
+
+1. Leave **Starting point** at **starter**, then choose **Prepare workspace**. This copies the intentionally broken application and its Terraform wrapper.
+2. Under **Account & environment**, enter the **same profile, account and region as Game 07**, then choose **Save environment**. The runner reads the existing cluster connection.
+3. Select **Plan changes**, review the plan, type the displayed approval and choose **Apply reviewed plan**.
+4. Open **Workspace** or **Runbook** for the incident. A successful apply has deployed the failure; it does not mean the application is healthy.
+
+Open a **second terminal** for diagnosis. These commands select the same isolated cluster connection used by the browser:
+
+```bash
+cd ~/work/eks-terraform-examples
+source scripts/env.sh
+source "$LAB_ROOT/run/07-eks-foundation/session-env.sh"
+kubectl --context "$LAB_KUBE_CONTEXT" -n arcade-incident-01 get pods
+kubectl --context "$LAB_KUBE_CONTEXT" -n arcade-incident-01 describe pods -l app=incident
+```
+
+Expect the pod to fail to start. Collect the reason from the pod events, then edit **`run/scenario-01/candidate.yaml`** in your editor. This file is an input to Terraform. Return to **Environment → Plan changes → Apply reviewed plan** to deploy your repair. Use **Submit repair** and the runbook's HTTP check to prove that the application works. The **Coach** has progressive hints when you need them.
+
+Do not rerun the runbook's manual workspace-creation commands after preparing through Environment. You already have the working copy; use its investigation, repair and acceptance instructions.
+
+### 3. Delete the application, then the cluster
+
+1. In **Incident 01 → Environment**, choose **Plan cleanup**. Review the deletion plan, type its exact `DESTROY` phrase and choose **Delete planned resources**.
+2. Confirm the incident namespace is gone using its runbook checks. If you created other workloads on this cluster, clean those up too.
+3. In **Game 07 → Environment**, repeat **Plan cleanup → review → type the displayed phrase → Delete planned resources**.
+4. Follow the launch guide's final deletion checks: empty Terraform state and the named EKS cluster returning `ResourceNotFoundException`. Keep the workspace if any check fails.
+
+**Closing a tab, stopping the server or marking a mission complete does not delete AWS resources.** Finish cleanup first. [The launch guide](lab-launcher.md) includes exact terminal cleanup commands and recovery steps.
 
 ## Work through a mission
 
@@ -46,28 +95,21 @@ The **Workspace** view follows five stages:
 
 Check each task only after doing it, then select **Record & continue**. You can jump to any stage, including cleanup, at any time. Completing all stages records mission completion. These task checks and written evidence remain self-reported. The separate **Environment** tab can run supported operations when the local runner is enabled, and stores repair receipts independently. Neither study completion nor a successful apply certifies teardown.
 
-Use **Open complete runbook here** to read the source without leaving your stage. **Full-screen instructions** opens the **Runbook** view, and **Starter & reference files** opens **Files**. Command cards have copy buttons, but they are checkpoints rather than complete deployment scripts: first run the source’s setup, exports and working-directory commands. Kubernetes repairs edit `candidate.yaml` and go through the workload’s Terraform plan and apply. Diagnostic `kubectl` reads are useful; manual patches and console edits do not count as the repair. The app cannot change your terminal environment.
+Use **Open complete runbook here** to read the source without leaving your stage. **Full-screen instructions** opens the **Runbook** view, and **Starter & reference files** opens **Files**. Command cards have copy buttons, but they are checkpoints rather than complete deployment scripts. Follow the launch guide for setup and shell activation; if Environment already prepared and applied the lab, continue at the runbook’s diagnosis steps instead of creating another working copy. Kubernetes repairs edit `candidate.yaml` and go through the workload’s Terraform plan and apply. Diagnostic `kubectl` reads are useful; manual patches and console edits do not count as the repair. The app cannot change your terminal environment.
 
-**Guided** mode opens command checkpoints by default. **Interview** mode initially collapses those details and prompts you to explain your hypothesis before seeking help. You can still open commands, hints and solutions. It is a practice preference, not a locked assessment or automatic score.
+The Workspace’s **Guided** study mode opens command checkpoints by default. This is separate from choosing **guided** as the Environment starting point. **Interview** mode initially collapses those details and prompts you to explain your hypothesis before seeking help. You can still open commands, hints and solutions. It is a practice preference, not a locked assessment or automatic score.
 
 The older four-checkpoint session sidebar remains available on Runbook, Files, Hints, Solution and My notes. You can use it to record build/reproduction, explanation, verification and cleanup, then **Mark complete**. These checks share the mission record with the workspace; checking them does not fabricate individual task evidence or five-stage history.
 
-## Operate the environment
+## Other labs and environment controls
 
-Install tools with `./arcade setup`, authenticate your named AWS profile, then restart the local server with the runner explicitly enabled:
+Use the [AWS launch guide](lab-launcher.md) to choose another real-cloud lab. Game 05 is a small serverless exercise without an EKS prerequisite; Game 13 adds a real internet path on your existing cluster. The browser, `./arcade session` CLI and `./arcade tui` share the same registered workspace, saved plan, inventory and repair receipt.
 
-```bash
-./arcade serve --runner
-```
+Built-in lifecycle controls support Games 00, 01, 03, 04, 05, 07, 08, 09, 10, 13 and incidents 11-01 through 11-10. Games 02, 06 and 12 use their complete runbooks for state migration, import and exercises spanning several labs.
 
-Open a mission’s **Environment** tab. The browser, `./arcade session` CLI and `./arcade tui` use the same registered workspace, plan, inventory and repair receipt. The browser supports lifecycle operations for Games 00, 01, 03, 04, 05, 07, 08, 09, 10, 13 and incidents 11-01 through 11-10. Games 02, 06 and 12 retain their complete ordered runbooks for the deliberate state migration, import and multi-lab steps. Game 11 links to its incidents.
+Follow **Prepare these first** before starting a dependent lab. For missions with a **Terraform root** selector, each root has its own state: Games 09/10 use **Infrastructure** then **workload**; Game 13 uses **workload** then **access**. Configure, plan and apply each in that order; clean up in reverse. Returning to a prepared workspace preserves its edits and state.
 
-1. Read **Prepare these first** and follow each prerequisite link. Preparing files does not make infrastructure ready.
-2. Select **Starting point** and **Prepare workspace**. Returning to a prepared workspace preserves its edits and state. For a multi-root mission, choose the **Terraform root**: Games 09/10 use Infrastructure (`.`) then `workload`; Game 13 uses `workload` then `access`.
-3. Open **Account & environment** and **Save environment** for each root. Supply a named authenticated profile, intended account and `us-west-2`. Standalone AWS labs require a unique resource prefix. Game 07 also needs your permanent IAM role/user ARN and public IPv4 `/32`; Game 13’s access root needs the `/32`. Never paste access keys into the form.
-4. Choose **Plan changes** and review **Saved plan**. The summary shows resource actions and uncertainty while omitting values. Review private plan details in the terminal when needed. Type the exact displayed phrase, such as `APPLY 123456789012` or `APPLY LOCAL`, then choose **Apply reviewed plan**. Changes to source, inputs, state or saved plan bytes require a new plan; approval is bound to the reviewed plan digest.
-5. Diagnose with the mission runbook, edit Terraform inputs/source or `candidate.yaml`, then plan and apply the repair. Choose **Submit repair** to collect bounded observations without changing deployed infrastructure. Read every failed or incomplete check and any **Needs a new check** marker.
-6. Choose **Plan cleanup**, review the separate deletion plan and type its `DESTROY` phrase. Follow **Before you leave** and the complete cleanup commands in dependency order, then submit for available cleanup observations and perform the remaining absence checks.
+Every apply uses the specific plan you reviewed. Changes to source, inputs, state or saved plan bytes require a new plan. Approval is bound to that plan's digest.
 
 **Repair evidence** shows a dated pass, failure or incomplete result and each expected/observed check. It stays separate from study completion. Source or state changes make old evidence stale. Missions without an automated behavioral checker return incomplete evidence; Game 08 and Incident 08 also leave functional acceptance checks for the runbook. HTTP reachability, eviction and other operational tests may still require terminal work.
 
@@ -76,6 +118,20 @@ Open a mission’s **Environment** tab. The browser, `./arcade session` CLI and 
 Jobs run one at a time and show bounded command-status events. Closing or navigating away from the tab does not cancel an operation; returning to Environment reconnects to its status while the server remains running. Browser events omit raw tool output. For a failed operation, keep state and investigate through the terminal and runbook before reviewing a fresh plan. After a server restart, inspect the retained session result and state before retrying. No automatic repair or timed cleanup runs.
 
 The runner accepts only fixed operations for catalog missions and their declared roots. Mutations require the current local process’s capability token and valid Host/Origin checks. It is a local learner tool; it does not accept arbitrary shell commands or filesystem paths.
+
+## Browse without enabling the runner
+
+Run `./arcade serve` without `--runner` for read-only browsing. You can read runbooks, keep notes and use simulated drills without AWS credentials or an internet connection. Local session status is visible, but the browser cannot run lab operations. The server requires Python 3.10+ on Linux, macOS or WSL2 and accepts only loopback connections. No npm installation is required.
+
+## Optional: practice without AWS
+
+The **Practice desk** has four authored investigations and three Terraform plan-reading drills. Their observation output is simulated, and displayed diagnostic commands never execute. Open a brief, reveal one observation at a time, choose a decision and read the explanation. The debrief connects decisive evidence to a Terraform repair, recovery proof, cleanup and a changed-constraint interview question.
+
+Select **Finish attempt** after choosing an answer to save a compact summary. Merely opening, refreshing or revisiting a drill does not record a completion. **New attempt** starts another repetition; completed attempts stay separate from the 24 hands-on mission records. The newest 20 summaries retain the drill, completion time, first-answer result, revealed observation IDs and practice duration. A drill result does not prove cloud health, cleanup, safety or mastery.
+
+The desk suggests an incorrectly answered drill first, then a never-attempted drill, then the least recently completed one. It shows its reason and lets you choose freely. Export and restore preserve the summaries and current attempt; repeated restore does not duplicate attempts with the same ID.
+
+For the same authored content in a terminal, use `./arcade drill list` or the [full-screen terminal workspace](tui.md). The Environment tab shows a value-free summary of a saved session plan. For other local plans, [the plan coach](plan-review.md) accepts Terraform show JSON through `./arcade review-plan PATH` or standard input. There is no plan-upload endpoint; raw plan values stay out of the browser.
 
 ## Appearance
 
